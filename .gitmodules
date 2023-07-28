@@ -1,0 +1,3 @@
+[submodule "src/SCD"]
+	path = src/SCD
+	url = https://github.com/DAMA-UPC/SCD.git

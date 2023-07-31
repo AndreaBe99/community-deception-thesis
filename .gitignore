@@ -160,6 +160,24 @@ cython_debug/
 #.idea/
 
 
+#### DATASET ####
+amz/
+astr/
+dblp
+dol/
+erdos/
+fb-75/
+kar/
+lesm/
+mad/
+ork/
+polb/
+pow/
+words/
+you/
+*.zip
+*.gz
+*.bz2
 
 #### TEST FILES ####
 test_*.ipynb

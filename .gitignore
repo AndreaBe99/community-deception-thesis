@@ -167,3 +167,4 @@ test_*.ipynb
 #### TEST REPOSITORIES ####
 graph_sample_rl-master/
 network-rewiring-rl-main/
+GraphRewiring-main/

@@ -161,23 +161,9 @@ cython_debug/
 
 
 #### DATASET ####
-amz/
-astr/
-dblp
-dol/
-erdos/
-fb-75/
-kar/
-lesm/
-mad/
-ork/
-polb/
-pow/
-words/
-you/
-*.zip
-*.gz
-*.bz2
+archives/
+dblp.mtx
+you.mtx
 
 #### TEST FILES ####
 test_*.ipynb

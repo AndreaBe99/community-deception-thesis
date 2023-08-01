@@ -1,5 +1,5 @@
-% sym unweighted
-% 78 34 34
+%%MatrixMarket matrix coordinate pattern symmetric
+34 34 78
 1 2
 1 3
 2 3

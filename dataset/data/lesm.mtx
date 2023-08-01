@@ -1,5 +1,5 @@
-% sym posweighted
-% 254 77 77
+%%MatrixMarket matrix coordinate pattern symmetric
+77 77 254
 1 2 1
 2 3 8
 2 4 10

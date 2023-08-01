@@ -1,6 +1,6 @@
 # Datsets
 
-The files relating to each dataset are available in the following Google Drive folder: [datsets](https://drive.google.com/drive/folders/1UFBZmP7FuU0kJHvM691BMpl7UKVtAlBH?usp=sharing).
+Some datasets are not in the correct Matrix Market format, for this reason I have uploaded the correct datasets to the following Kaggle Dataset [page](https://www.kaggle.com/datasets/andreabernini/network-community), and also to the following Google Drive [folder](https://drive.google.com/drive/folders/1UFBZmP7FuU0kJHvM691BMpl7UKVtAlBH?usp=sharing).
 
 ## [KONECT](http://konect.cc/)
 

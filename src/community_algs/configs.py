@@ -1,16 +1,17 @@
+"""Module for the configuration of the community detection algorithms"""
 from enum import Enum
 
 class DetectionAlgorithms(Enum):
     """
     Enum class for the detection algorithms
     """
-    louv = "louvain"
-    walk = "walktrap"
-    gre  = "greedy"
-    inf  = "infomap"
-    lab  = "label_propagation"
-    eig  = "eigenvector"
-    btw  = "edge_betweenness"
-    spin = "spinglass"
-    opt  = "optimal"
-    scd  = "scalable_community_detection"
+    LOUV = "louvain"
+    WALK = "walktrap"
+    GRE  = "greedy"
+    INF  = "infomap"
+    LAB  = "label_propagation"
+    EIG  = "eigenvector"
+    BTW  = "edge_betweenness"
+    SPIN = "spinglass"
+    OPT  = "optimal"
+    SCD  = "scalable_community_detection"

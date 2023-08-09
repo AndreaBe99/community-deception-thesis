@@ -8,8 +8,8 @@ import math
 class NormalizedMutualInformation(object):
     @staticmethod
     def calculate_confusion_matrix(
-            communities_old: List(List(int)),
-            communities_new: List(List(int))) -> Counter:
+            communities_old: List[List[int]],
+            communities_new: List[List[int]]) -> Counter:
         """
         Calculate the confusion matrix between two sets of communities.
         Where the element (i, j) of the confusion matrix is the number of shared
@@ -18,9 +18,9 @@ class NormalizedMutualInformation(object):
 
         Parameters
         ----------
-        communities_old : List(List(int)
+        communities_old : List[List[int]]
             Communities before deception
-        communities_new : List(List(int)
+        communities_new : List[List[int]]
             Communities after deception
 
         Returns
@@ -36,7 +36,7 @@ class NormalizedMutualInformation(object):
         return confusion_matrix
 
     @staticmethod
-    def calculate_sums(confusion_matrix: Counter) -> Tuple(Counter, Counter, int):
+    def calculate_sums(confusion_matrix: Counter) -> Tuple[Counter, Counter, int]:
         """
         Calculate the row sums, column sums and total sum of a confusion matrix.
 
@@ -47,7 +47,7 @@ class NormalizedMutualInformation(object):
 
         Returns
         -------
-        (row_sums, col_sums, total_sum) : Tuple(Counter, Counter, int)
+        (row_sums, col_sums, total_sum) : Tuple[Counter, Counter, int]
             Tuple containing the row sums, column sums and total sum of the
             confusion matrix.
         """
@@ -62,17 +62,17 @@ class NormalizedMutualInformation(object):
 
     def compute_nmi(
             self,
-            communities_old: List(List(int)),
-            communities_new: List(List(int))) -> float:
+            communities_old: List[List[int]],
+            communities_new: List[List[int]]) -> float:
         """
         Calculate the normalized mutual information between two sets of
         Communities.
 
         Parameters
         ----------
-        communities_old : List(List(int)
+        communities_old : List[List[int]]
             List of communities before deception
-        communities_new : List
+        communities_new : List[List[int]]
             List of communities after deception
 
         Returns
@@ -83,12 +83,18 @@ class NormalizedMutualInformation(object):
         confusion_matrix = self.calculate_confusion_matrix(
             communities_old, communities_new)
         row_sums, col_sums, total_sum = self.calculate_sums(confusion_matrix)
+        
         # Numerator
         nmi_numerator = 0
         for (i, j), n_ij in confusion_matrix.items():
             n_i = row_sums[i]
             n_j = col_sums[j]
-            nmi_numerator += n_ij * math.log((n_ij * total_sum) / (n_i * n_j))
+            try:
+                nmi_numerator += n_ij * math.log((n_ij * total_sum) / (n_i * n_j))
+            except ValueError:
+                # We could get a math domain error if n_ij is 0
+                continue
+        
         # Denominator
         nmi_denominator = 0
         for i, n_i in row_sums.items():
@@ -96,5 +102,16 @@ class NormalizedMutualInformation(object):
         for j, n_j in col_sums.items():
             nmi_denominator += n_j * math.log(n_j / total_sum)
         # Normalized mutual information
-        nmi = -2 * nmi_numerator / nmi_denominator
-        return nmi
+        nmi_score = -2 * nmi_numerator / nmi_denominator
+        return nmi_score
+
+if __name__ == "__main__":
+    # Test
+    nmi = NormalizedMutualInformation()
+    communities_old = [[1, 2, 3], [4, 5, 6]]
+    communities_new = [[1, 2, 3], [4, 5, 6]]
+    print(nmi.compute_nmi(communities_old, communities_new))
+
+    communities_old = [[1, 2, 3], [4, 5, 6]]
+    communities_new = [[1, 3], [2, 5], [4, 6]]
+    print(nmi.compute_nmi(communities_old, communities_new))

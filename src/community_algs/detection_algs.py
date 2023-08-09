@@ -1,7 +1,13 @@
-# Types Hinting
-from typing import List, Tuple, Annotated
+"""Module for community detection algorithms"""
+import sys
+sys.path.append('/src/community_algs/')
 
-# Graphs
+from configs import DetectionAlgorithms
+# from src.community_algs.configs import DetectionAlgorithms
+from typing import List
+
+import os
+
 import networkx as nx
 import igraph as ig
 
@@ -9,13 +15,9 @@ import igraph as ig
 import matplotlib.pyplot as plt
 plt.style.use('default')
 
-# Misc
-from src.community_algs.configs import DetectionAlgorithms # Algs Names
-import os
-
-
-
 class DetectionAlgorithm(object):
+    """Class for the community detection algorithms"""
+    
     def __init__(self, alg_name: str) -> None:
         """
         Initialize the DetectionAlgorithm object
@@ -30,8 +32,8 @@ class DetectionAlgorithm(object):
 
     def networkx_to_igraph(self, graph: nx.Graph) -> ig.Graph:
         """
-        Convert networkx graph to igraph graph, in this way we can use 
-        igraph's community detection algorithms
+        Convert NetworkX graph to iGraph graph, in this way we can use 
+        iGraph's community detection algorithms
         
         Parameters
         ----------
@@ -66,39 +68,39 @@ class DetectionAlgorithm(object):
         graph = self.networkx_to_igraph(graph)
 
         # Rename DetectionAlgorithms Enum to da for convenience
-        da = DetectionAlgorithms()
+        da = DetectionAlgorithms
         # Choose the algorithm
-        if self.alg_name == da.louv.value:
+        if self.alg_name == da.LOUV.value:
             return self.compute_louv(graph, args)
-        elif self.alg_name == da.walk.value:
+        elif self.alg_name == da.WALK.value:
             return self.compute_walk(graph, args)
-        elif self.alg_name == da.gre.value:
+        elif self.alg_name == da.GRE.value:
             return self.compute_gre(graph, args)
-        elif self.alg_name == da.inf.value:
+        elif self.alg_name == da.INF.value:
             return self.compute_inf(graph, args)
-        elif self.alg_name == da.lab.value:
+        elif self.alg_name == da.LAB.value:
             return self.compute_lab(graph, args)
-        elif self.alg_name == da.eig.value:
+        elif self.alg_name == da.EIG.value:
             return self.compute_eig(graph, args)
-        elif self.alg_name == da.btw.value:
+        elif self.alg_name == da.BTW.value:
             return self.compute_btw(graph, args)
-        elif self.alg_name == da.spin.value:
+        elif self.alg_name == da.SPIN.value:
             return self.compute_spin(graph, args)
-        elif self.alg_name == da.opt.value:
+        elif self.alg_name == da.OPT.value:
             return self.compute_opt(graph, args)
-        elif self.alg_name == da.scd.value:
-            return self.compute_scd(graph, args)
+        elif self.alg_name == da.SCD.value:
+            return self.compute_scd(graph)
         else:
             raise ValueError('Invalid algorithm name')
 
-    def vertexcluster_to_list(self, cluster: nx.VertexClustering) -> List[List[int]]:
+    def vertexcluster_to_list(self, cluster: ig.VertexClustering) -> List[List[int]]:
         """
-        Convert igraph.VertexClustering object to list of list of vertices in each cluster
+        Convert iGraph.VertexClustering object to list of list of vertices in each cluster
 
         Parameters
         ----------
-        cluster : VertexClustering
-            cluster from igraph community detection algorithm
+        cluster : ig.VertexClustering
+            cluster from iGraph community detection algorithm
 
         Returns
         -------
@@ -108,7 +110,7 @@ class DetectionAlgorithm(object):
         return [c for c in cluster]
 
     def plot_graph(self) -> plt:
-        """Plot the graph using igraph
+        """Plot the graph using iGraph
         
         Returns
         ---------
@@ -144,7 +146,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        louv = graph.community_leiden(**args_louv)
+        if args_louv is None:
+            louv = graph.community_leiden()
+        else:
+            louv = graph.community_leiden(**args_louv)
         return self.vertexcluster_to_list(louv)
 
     def compute_walk(self, graph: ig.Graph, args_walk: dict) -> List[List[int]]:
@@ -163,7 +168,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        walk = graph.community_walktrap(**args_walk)
+        if args_walk is None:
+            walk = graph.community_walktrap()
+        else:
+            walk = graph.community_walktrap(**args_walk)
         # Need to be converted to VertexClustering object
         return self.vertexcluster_to_list(walk.as_clustering())
 
@@ -183,11 +191,14 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        greed = graph.community_fastgreedy(**args_gre)
+        if args_gre is None:
+            greed = graph.community_fastgreedy()
+        else:
+            greed = graph.community_fastgreedy(**args_gre)
         # Need to be converted to VertexClustering object
         return self.vertexcluster_to_list(greed.as_clustering())
 
-    def compute_infomap(self, graph: ig.Graph, args_infomap: dict) -> List[List[int]]:
+    def compute_inf(self, graph: ig.Graph, args_infomap: dict) -> List[List[int]]:
         """
         Compute the Infomap community detection algorithm
         
@@ -203,7 +214,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        infomap = graph.community_infomap(**args_infomap)
+        if args_infomap is None:
+            infomap = graph.community_infomap()
+        else:
+            infomap = graph.community_infomap(**args_infomap)
         return self.vertexcluster_to_list(infomap)
 
     def compute_lab(self, graph: ig.Graph, args_lab: dict) -> List[List[int]]:
@@ -222,7 +236,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        lab = graph.community_label_propagation(**args_lab)
+        if args_lab is None:
+            lab = graph.community_label_propagation()
+        else:
+            lab = graph.community_label_propagation(**args_lab)
         return self.vertexcluster_to_list(lab)
 
     def compute_eig(self, graph: ig.Graph, args_eig: dict) -> List[List[int]]:
@@ -241,7 +258,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        eig = graph.community_leading_eigenvector(**args_eig)
+        if args_eig is None:
+            eig = graph.community_leading_eigenvector()
+        else:
+            eig = graph.community_leading_eigenvector(**args_eig)
         return self.vertexcluster_to_list(eig)
 
     def compute_btw(self, graph: ig.Graph, args_btw: dict) -> List[List[int]]:
@@ -260,7 +280,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        btw = graph.community_edge_betweenness(**args_btw)
+        if btw is None:
+            btw = graph.community_edge_betweenness()
+        else:
+            btw = graph.community_edge_betweenness(**args_btw)
         # Need to be converted to VertexClustering object
         return self.vertexcluster_to_list(btw.as_clustering())
 
@@ -280,7 +303,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        spin = graph.community_spinglass(**args_spin)
+        if args_spin is None:
+            spin = graph.community_spinglass()
+        else:
+            spin = graph.community_spinglass(**args_spin)
         return self.vertexcluster_to_list(spin)
 
     def compute_opt(self, graph: ig.Graph, args_opt: dict) -> List[List[int]]:
@@ -299,10 +325,13 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        opt = graph.community_optimal_modularity(**args_opt)
+        if args_opt is None:
+            opt = graph.community_optimal_modularity()
+        else:
+            opt = graph.community_optimal_modularity(**args_opt)
         return self.vertexcluster_to_list(opt)
-
-    def compute_scd(self, graph: ig.Graph, args_scd: dict) -> List[List[int]]:
+    
+    def compute_scd(self, graph: ig.Graph) -> List[List[int]]:
         """
         Compute the Surprise community detection algorithm
         
@@ -310,9 +339,7 @@ class DetectionAlgorithm(object):
         ----------
         graph : ig.Graph
             The graph to be clustered
-        args_scd : dict
-            The arguments for the Surprise algorithm
-
+            
         Returns
         ----------
         List[List[int]]
@@ -324,7 +351,7 @@ class DetectionAlgorithm(object):
         os.system("./../src/SCD/build/scd -f output.txt")
         result_list = self.read_data_from_file('communities.dat')
         return result_list
-
+    
     @staticmethod
     def write_graph_to_file(graph: ig.Graph, file_path: str) -> None:
         """
@@ -338,7 +365,7 @@ class DetectionAlgorithm(object):
         file_path : str
             file path of the output file
         """
-        with open(file_path, 'w') as file:
+        with open(file_path, 'w', encoding='utf-8') as file:
             for edge in graph.get_edgelist():
                 # To ensure we don't duplicate edges (x, y) and (y, x)
                 if edge[0] < edge[1]:
@@ -361,8 +388,18 @@ class DetectionAlgorithm(object):
             List of lists, where each row list of nodes is a community.
         """
         data_list = []
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='utf-8') as file:
             for line in file:
                 numbers = [int(num) for num in line.strip().split()]
                 data_list.append(numbers)
         return data_list
+
+if __name__ == "__main__":
+    # Create a graph
+    g = nx.karate_club_graph()
+    # Create an instance of the class, and choose the algorithm
+    alg = DetectionAlgorithm(DetectionAlgorithms.WALK.value)
+    # Compute the communities
+    comms = alg.compute_community(g)
+    # Print the communities
+    print(comms)

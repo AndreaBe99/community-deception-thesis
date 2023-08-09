@@ -1,3 +1,4 @@
+"""Module to store utility functions and constants"""
 from enum import Enum
 import os
 
@@ -17,3 +18,18 @@ class HyperParams(Enum):
     Hyperparameters for the model.
     """
     WEIGHT = 0.5
+
+class DetectionAlgorithms(Enum):
+    """
+    Enum class for the detection algorithms
+    """
+    LOUV = "louvain"
+    WALK = "walktrap"
+    GRE  = "greedy"
+    INF  = "infomap"
+    LAB  = "label_propagation"
+    EIG  = "eigenvector"
+    BTW  = "edge_betweenness"
+    SPIN = "spinglass"
+    OPT  = "optimal"
+    SCD  = "scalable_community_detection"

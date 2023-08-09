@@ -1,9 +1,9 @@
 """Module for community detection algorithms"""
 import sys
-sys.path.append('/src/community_algs/')
+sys.path.append('../../')
 
-from configs import DetectionAlgorithms
-# from src.community_algs.configs import DetectionAlgorithms
+from src.utils import DetectionAlgorithms
+
 from typing import List
 
 import os

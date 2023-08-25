@@ -6,6 +6,7 @@ import sys
 sys.path.append('../../')
 
 from src.utils import FilePaths
+from src.embedding.graph_encoder import GraphEncoder
 
 class CriticNetwork(nn.Module):
     def __init__(

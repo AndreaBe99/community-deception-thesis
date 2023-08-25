@@ -168,6 +168,8 @@ you.mtx
 
 #### TEST FILES ####
 test_*.ipynb
+test_*.py
+test_*.md
 
 #### TEST REPOSITORIES ####
 repo/

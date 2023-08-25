@@ -7,6 +7,7 @@ import sys
 sys.path.append('../../')
 
 from src.utils import FilePaths
+from src.embedding.graph_encoder import GraphEncoder
 
 
 class ActorNetwork(nn.Module):
@@ -35,7 +36,7 @@ class ActorNetwork(nn.Module):
             'cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
-    def forward(self, state):
+    def forward(self, state: torch.Tensor):
         g = self.graph_encoder(state)
         actions = self.relu(self.linear1(g))
         actions = self.tanh(self.linear2(actions))

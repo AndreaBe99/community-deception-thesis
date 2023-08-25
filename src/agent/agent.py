@@ -32,7 +32,22 @@ class Agent:
 
         self.MseLoss = nn.MSELoss()
 
-    def select_action(self, state, memory):
+    def select_action(self, state: torch.Tensor, memory: Memory)-> list:
+        """
+        Select an action given the current state
+
+        Parameters
+        ----------
+        state : _type_
+            state
+        memory : Memory
+            Memory object
+
+        Returns
+        -------
+        action: torch.Tensor
+            Action to take
+        """
         #  # state = torch.FloatTensor(state.reshape(1, -1)).to(device)
         # ! OLD
         # return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
@@ -40,22 +55,30 @@ class Agent:
         # ! NEW
         with torch.no_grad():
             # state = torch.FloatTensor(state).to(device)
-            action, action_logprob = self.policy_old.act(state)
-        memory.states.append(state)
-        memory.actions.append(action)
-        memory.logprobs.append(action_logprob)
-        return action.item()
+            action, action_logprob = self.policy_old.act(state, memory)
+        # memory.states.append(state)
+        # memory.actions.append(action)
+        # memory.logprobs.append(action_logprob)
+        return action.tolist()
             
-    def update(self):
+    def update(self, memory: Memory):
+        """
+        Update the policy
+
+        Parameters
+        ----------
+        memory : Memory
+            Memory object
+        """
         # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
-        for reward, is_terminal in zip(reversed(self.memory.rewards), reversed(self.memory.is_terminals)):
+        for reward, is_terminal in zip(reversed(memory.rewards), reversed(memory.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-
+        
         # Normalizing the rewards:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         # ! OLD
@@ -64,19 +87,26 @@ class Agent:
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
 
         # convert list to tensor
-        # # old_states = torch.squeeze(torch.stack(self.memory.states).to(device), 1).detach()
+        # # old_states = torch.squeeze(torch.stack(memory.states).to(self.device), 1).detach()
         # ! OLD
-        # old_states = self.memory.states
-        # old_actions = torch.squeeze(torch.stack(self.memory.actions).to(DEVICE), 1).detach()
-        # old_logprobs = torch.squeeze(torch.stack(self.memory.logprobs), 1).to(DEVICE).detach()
+        # old_states = memory.states
+        # old_actions = torch.squeeze(torch.stack(memory.actions).to(self.device), 1).detach()
+        # old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(self.device).detach()
         # ! NEW
-        old_states = torch.squeeze(torch.stack(
-            self.memory.states, dim=0)).detach().to(self.device)
-        old_actions = torch.squeeze(torch.stack(
-            self.memory.actions, dim=0)).detach().to(self.device)
-        old_logprobs = torch.squeeze(torch.stack(
-            self.memory.logprobs, dim=0)).detach().to(self.device)
+        # Find the maximum size of the tensors in memory.states
+        max_size = max([s.size() for s in memory.states])
+        # Pad all tensors to the maximum size
+        padded_states = [torch.nn.functional.pad(s, (-1, max_size[1]-s.size(1), 0, max_size[0]-s.size(0))) for s in memory.states]
+        # Stack the padded tensors
+        # old_states = torch.stack(padded_states, dim=0).detach().to(self.device)
         
+        # # old_states = torch.squeeze(torch.stack(memory.states, dim=0)).detach().to(self.device)
+        # old_states = memory.states
+        
+        old_states = torch.squeeze(torch.stack(padded_states, dim=1)).detach().to(self.device)
+        old_actions = torch.squeeze(torch.stack(memory.actions, dim=1)).detach().to(self.device)
+        old_logprobs = torch.squeeze(torch.stack(memory.logprobs, dim=1)).detach().to(self.device)
+                
         # Optimize policy for K epochs:
         for _ in range(self.K_epochs):
             # Evaluating old actions and values :
@@ -88,9 +118,13 @@ class Agent:
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
-
+            
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach()
+            # print("Shape of advantages: ", advantages.shape)    # 100
+            # print("Shape of ratios: ", ratios.shape)            # 200
+            # print("Shape old states: ", old_states.shape)       # 2, 200, 81
+            # print("Shape old actions: ", old_actions.shape)     # 200, 147
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip,
                                 1+self.eps_clip) * advantages
@@ -109,4 +143,4 @@ class Agent:
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
         # Clear memory
-        self.memory.clear_memory()
+        memory.clear_memory()

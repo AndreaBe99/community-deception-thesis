@@ -2,7 +2,8 @@
 import sys
 sys.path.append('../../')
 
-from src.agent.network import ActorNetwork, CriticNetwork
+from src.agent.actor import ActorNetwork
+from src.agent.critic import CriticNetwork
 from src.agent.memory import Memory
 from torch import nn
 from torch.distributions import MultivariateNormal
@@ -40,15 +41,15 @@ class ActorCritic(nn.Module):
         """Forward pass"""
         raise NotImplementedError
 
-    def act(self, state, memory: Memory)-> Tuple[torch.Tensor, torch.Tensor]:
+    def act(self, state: torch.Tensor, memory: Memory)-> Tuple[torch.Tensor, torch.Tensor]:
         """
         Compute the action to take given the current state
 
         Parameters
         ----------
-        state : _type_
+        state : torch.Tensor
             Current state
-        memory : M
+        memory : Memory
             Memory object
 
         Returns
@@ -70,7 +71,7 @@ class ActorCritic(nn.Module):
         # return action.detach()
         return action.detach(), action_logprob.detach()
     
-    def evaluate(self, state, action)-> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def evaluate(self, state: torch.Tensor, action)-> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Evaluate the current state and action
 

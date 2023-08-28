@@ -20,22 +20,26 @@ import torch
 class GraphEnvironment(object):
     """Enviroment where the agent will act, it will be a graph with a community"""
 
-    def __init__(self, beta: float) -> None:
+    def __init__(self, beta: float, debug: float=None) -> None:
         """Constructor for Graph Environment
 
         Parameters
         ----------
         beta : float
             Percentage of edges to rewire/update, real number between 1 and 100
+        debug : float, optional
+            Whether to print debug information, by default None
         """
         assert beta >= 0 and beta <= 100, "Beta must be between 0 and 100"
         self.beta = beta
+        self.debug = debug
         self.eps = 1e-8
         self.rewards_scale_multiplier = 10 # 0, 10, 100
         
         self.nmi = NormalizedMutualInformation()
         # Setup later, with the setup function
         self.graph = None
+        self.graph_copy = None
         self.deception = None
         self.detection = None
         # Community to hide
@@ -47,17 +51,16 @@ class GraphEnvironment(object):
         self.n_connected_components = None
         self.training = None
         self.rewards = None
+        
+        # Test
+        self.old_rewards = 0
+        
         self.edge_budget = None
         self.used_edge_budget = None
         self.exhausted_budget = None
         
         # Possible actions
         self.possible_actions = None
-        
-        # objective_function_values[0] --> Old Value, i.e. before the action
-        # objective_function_values[1] --> New Value, i.e. after the action
-        # The Value is the Deception Score
-        self.objective_function_values = np.zeros(2, dtype=float)
     
     @staticmethod
     def get_possible_actions(
@@ -145,6 +148,13 @@ class GraphEnvironment(object):
         """
         reward = weight * deception_score + (1 - weight) * nmi_score
         return reward
+    
+    def plot_graph(self) -> None:
+        """Plot the graph using matplotlib"""
+        import matplotlib.pyplot as plt
+        nx.draw(self.graph, with_labels=True)
+        plt.show()
+        
 
     def delete_repeat_edges(self, data: Data) -> torch.Tensor:
         """The Data object contains the edge_index tensor, which is a tensor
@@ -184,6 +194,8 @@ class GraphEnvironment(object):
         self.used_edge_budget = 0
         self.exhausted_budget = False
         self.graph = self.graph_copy.copy()
+        self.possible_actions = self.get_possible_actions(
+            self.graph, self.community_target)
         # self.rewards = 0.0
         
         data = self.delete_repeat_edges(from_networkx(self.graph))
@@ -232,7 +244,10 @@ class GraphEnvironment(object):
             idx = self.possible_actions["REMOVE"].index(action)
             self.possible_actions["REMOVE"][idx] = (-1,-1)
             budget_consumed = 1
-            # print("Remove", action)
+            
+            if self.debug:
+                print("Removed edge:", action)
+        
         elif action in self.possible_actions["ADD"]:
             self.graph.add_edge(*action, weight=1)
             # Replace the added edge with (-1,-1) in the possible actions, in this way
@@ -241,7 +256,9 @@ class GraphEnvironment(object):
             idx = self.possible_actions["ADD"].index(action)
             self.possible_actions["ADD"][idx] = (-1,-1)
             budget_consumed = 1
-            # print("Add", action)
+            
+            if self.debug:
+                print("Added edge:", action)
         else:
             budget_consumed = 0
         return budget_consumed
@@ -291,12 +308,6 @@ class GraphEnvironment(object):
         self.possible_actions = self.get_possible_actions(
             self.graph, self.community_target)
         
-        # NOTE: Old method to compute the reward, i.e. the difference between the new and the old deception score
-        # Set first objective function value
-        # self.objective_function_values[0] = self.deception.compute_deception_score(self.community_structure_old)
-        # if self.training:
-        #    self.objective_function_values[0] = self.objective_function_values[0] * self.rewards_scale_multiplier 
-    
     def step(self, actions: List[float]) -> Tuple[Data, float]:
         """Step function for the environment
 
@@ -336,25 +347,24 @@ class GraphEnvironment(object):
         # Compute new deception score
         deception_score = self.deception.compute_deception_score(
             self.community_structure_new, self.n_connected_components)
+        
+        if self.debug:
+            print("Community Structure Old:", self.community_structure_new)
+            print("Deception Score:", deception_score)
+            print("NMI Score:", nmi)
+
+        
         # Compute the reward, using the deception score and the NMI score
         reward = self.get_reward(deception_score, nmi)
+        # TEST
+        reward -= self.old_rewards
+        if abs(reward) < self.eps or budget_consumed == 0:
+            reward = -1
+        self.rewards = reward
+        self.old_rewards = reward
         
         # Update the used edge budget
         self.used_edge_budget += (remaining_budget - updated_budget)
-        
-        # NOTE: Old method to compute the reward, i.e. the difference between the new and the old deception score
-        # Update the objective function value, i.e. compute the new deception score
-        # self.objective_function_values[1] = self.deception.compute_deception_score(self.community_structure_new)
-        # if self.training:
-        #    self.objective_function_values[1] *= self.rewards_scale_multiplier
-        
-        # Compute the reward as the difference between the Deception Score
-        # before and after the action
-        # reward = self.objective_function_values[0] - self.objective_function_values[1]
-        
-        if abs(reward) < self.eps:
-            reward = 0.0
-        self.rewards = reward
         
         data = self.delete_repeat_edges(from_networkx(self.graph))
         return data, self.rewards

@@ -23,6 +23,23 @@ python train.py
 
 ## References
 
+## Community Deception
+
+Paper about community deception:
+
+```bibtex
+@article{8118127,
+  author={Fionda, Valeria and Pirrò, Giuseppe},
+  journal={IEEE Transactions on Knowledge and Data Engineering}, 
+  title={Community Deception or: How to Stop Fearing Community Detection Algorithms}, 
+  year={2018},
+  volume={30},
+  number={4},
+  pages={660-673},
+  doi={10.1109/TKDE.2017.2776133}
+}
+```
+
 ### Code References
 
 A2C structure from:
@@ -41,12 +58,8 @@ Paper about graph rewiring using reinforcement learning:
 
 ```bibtex
 @article{DBLP:journals/corr/abs-2205-13578,
-  author       = {Christoffel Doorman and
-                  Victor{-}Alexandru Darvariu and
-                  Stephen Hailes and
-                  Mirco Musolesi},
-  title        = {Dynamic Network Reconfiguration for Entropy Maximization
-                  using Deep Reinforcement Learning},
+  author       = {Christoffel Doorman and Victor{-}Alexandru Darvariu and Stephen Hailes and Mirco Musolesi},
+  title        = {Dynamic Network Reconfiguration for Entropy Maximization using Deep Reinforcement Learning},
   journal      = {CoRR},
   volume       = {abs/2205.13578},
   year         = {2022},

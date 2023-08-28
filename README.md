@@ -29,14 +29,14 @@ Paper about community deception:
 
 ```bibtex
 @article{8118127,
-  author={Fionda, Valeria and Pirrò, Giuseppe},
-  journal={IEEE Transactions on Knowledge and Data Engineering}, 
-  title={Community Deception or: How to Stop Fearing Community Detection Algorithms}, 
-  year={2018},
-  volume={30},
-  number={4},
-  pages={660-673},
-  doi={10.1109/TKDE.2017.2776133}
+  author    = {Fionda, Valeria and Pirrò, Giuseppe},
+  journal   = {IEEE Transactions on Knowledge and Data Engineering}, 
+  title     = {Community Deception or: How to Stop Fearing Community Detection Algorithms}, 
+  year      = {2018},
+  volume    = {30},
+  number    = {4},
+  pages     = {660-673},
+  doi       = {10.1109/TKDE.2017.2776133}
 }
 ```
 
@@ -46,9 +46,9 @@ A2C structure from:
 
 ```bibtex
 @misc{yusx-swapp/gnn-rl-model-compression,
-    url={<https://github.com/yusx-swapp/GNN-RL-Model-Compression/tree/master>},
-    journal={GitHub}, 
-    year={2023} 
+    url     = {<https://github.com/yusx-swapp/GNN-RL-Model-Compression/tree/master>},
+    journal = {GitHub}, 
+    year    = {2023} 
 }
 ```
 
@@ -58,18 +58,18 @@ Paper about graph rewiring using reinforcement learning:
 
 ```bibtex
 @article{DBLP:journals/corr/abs-2205-13578,
-  author       = {Christoffel Doorman and Victor{-}Alexandru Darvariu and Stephen Hailes and Mirco Musolesi},
-  title        = {Dynamic Network Reconfiguration for Entropy Maximization using Deep Reinforcement Learning},
-  journal      = {CoRR},
-  volume       = {abs/2205.13578},
-  year         = {2022},
-  url          = {https://doi.org/10.48550/arXiv.2205.13578},
-  doi          = {10.48550/arXiv.2205.13578},
-  eprinttype   = {arXiv},
-  eprint       = {2205.13578},
-  timestamp    = {Tue, 31 May 2022 15:14:51 +0200},
-  biburl       = {https://dblp.org/rec/journals/corr/abs-2205-13578.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
+    author      = {Christoffel Doorman and Victor{-}Alexandru Darvariu and Stephen Hailes and Mirco Musolesi},
+    title       = {Dynamic Network Reconfiguration for Entropy Maximization using Deep Reinforcement Learning},
+    journal     = {CoRR},
+    volume      = {abs/2205.13578},
+    year        = {2022},
+    url         = {https://doi.org/10.48550/arXiv.2205.13578},
+    doi         = {10.48550/arXiv.2205.13578},
+    eprinttype  = {arXiv},
+    eprint      = {2205.13578},
+    timestamp   = {Tue, 31 May 2022 15:14:51 +0200},
+    biburl      = {https://dblp.org/rec/journals/corr/abs-2205-13578.bib},
+    bibsource   = {dblp computer science bibliography, https://dblp.org}
 }
 ```
 

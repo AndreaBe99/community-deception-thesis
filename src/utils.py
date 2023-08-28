@@ -47,7 +47,7 @@ class HyperParams(Enum):
     """
     Hyperparameters for the model.
     """
-    WEIGHT = 0.5
+    WEIGHT = 0.8
     G_IN_SIZE = 50
     HIDDEN1 = 300
     HIDDEN2 = 300
@@ -61,12 +61,13 @@ class HyperParams(Enum):
     K_EPOCHS = 10
     LOG_INTERVAL = 20
     MAX_EPISODES = 15000
-    MAX_TIMESTEPS = 5
+    MAX_TIMESTEPS = 100
     UPDATE_TIMESTEP = 100
-    SOLVED_REWARD = 0.8 * MAX_TIMESTEPS
+    SOLVED_REWARD = 0.6 * MAX_TIMESTEPS
     
     """Hyperparameters for the Environment"""
     BETA = 30
+    DEBUG = False
 
 class DetectionAlgorithms(Enum):
     """

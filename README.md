@@ -29,7 +29,7 @@ A2C structure from:
 
 ```bibtex
 @misc{yusx-swapp/gnn-rl-model-compression,
-    url={<https://github.com/yusx-swapp/GNN-RL-Model-Compression/tree/master}>,
+    url={<https://github.com/yusx-swapp/GNN-RL-Model-Compression/tree/master>},
     journal={GitHub}, 
     year={2023} 
 }
@@ -52,7 +52,7 @@ Paper about graph rewiring using reinforcement learning:
   year         = {2022},
   url          = {https://doi.org/10.48550/arXiv.2205.13578},
   doi          = {10.48550/arXiv.2205.13578},
-  eprinttype    = {arXiv},
+  eprinttype   = {arXiv},
   eprint       = {2205.13578},
   timestamp    = {Tue, 31 May 2022 15:14:51 +0200},
   biburl       = {https://dblp.org/rec/journals/corr/abs-2205-13578.bib},

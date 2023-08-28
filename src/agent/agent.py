@@ -5,6 +5,8 @@ sys.path.append('../../')
 from src.agent.network import ActorCritic
 from src.agent.memory import Memory
 from torch import nn
+from torch.nn.utils.rnn import pad_sequence
+from torch.nn.functional import pad
 
 import torch
 
@@ -70,24 +72,31 @@ class Agent:
         memory : Memory
             Memory object
         """
-        # Monte Carlo estimate of rewards:
         rewards = []
         discounted_reward = 0
+        # Compute the Monte Carlo estimate of the rewards for each time step in 
+        # the episode. This involves iterating over the rewards in reverse order 
+        # and computing the discounted sum of rewards from each time step to the 
+        # end of the episode. 
+        # The resulting rewards are then normalized by subtracting the mean
+        # and dividing by the standard deviation.
         for reward, is_terminal in zip(reversed(memory.rewards), reversed(memory.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
+
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
         
-        # Normalizing the rewards:
+        # Normalizing the rewards
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         # ! OLD
-        # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         # ! NEW
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
+        # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
 
-        # convert list to tensor
-        # # old_states = torch.squeeze(torch.stack(memory.states).to(self.device), 1).detach()
+        # Prepares the data for training the policy network. 
+        # The memory object contains lists of states, actions, log probabilities, 
+        # and rewards for each time step in the episode.
         # ! OLD
         # old_states = memory.states
         # old_actions = torch.squeeze(torch.stack(memory.actions).to(self.device), 1).detach()
@@ -96,35 +105,35 @@ class Agent:
         # Find the maximum size of the tensors in memory.states
         max_size = max([s.size() for s in memory.states])
         # Pad all tensors to the maximum size
-        padded_states = [torch.nn.functional.pad(s, (-1, max_size[1]-s.size(1), 0, max_size[0]-s.size(0))) for s in memory.states]
-        # Stack the padded tensors
-        # old_states = torch.stack(padded_states, dim=0).detach().to(self.device)
-        
-        # # old_states = torch.squeeze(torch.stack(memory.states, dim=0)).detach().to(self.device)
-        # old_states = memory.states
+        padded_states = [pad(s, (-1, max_size[1]-s.size(1), 0, max_size[0]-s.size(0))) for s in memory.states]
+        # padded_states = pad_sequence(memory.states, batch_first=True, padding_value=-1)
         
         old_states = torch.squeeze(torch.stack(padded_states, dim=1)).detach().to(self.device)
         old_actions = torch.squeeze(torch.stack(memory.actions, dim=1)).detach().to(self.device)
         old_logprobs = torch.squeeze(torch.stack(memory.logprobs, dim=1)).detach().to(self.device)
                 
-        # Optimize policy for K epochs:
-        for _ in range(self.K_epochs):
-            # Evaluating old actions and values :
+        # Optimize policy for K epochs
+        for i in range(self.K_epochs):
+            
+            # The loss function is computed using the ratio of the probabilities 
+            # of the actions under the new and old policies, multiplied by the 
+            # advantage of taking the action. The advantage is the difference 
+            # between the discounted sum of rewards and the estimated value of 
+            # the state under the current policy. The loss is also augmented 
+            # with a term that encourages the policy to explore different actions.
+            
+            # Evaluating old actions and values
             logprobs, state_values, dist_entropy = self.policy.evaluate(
                 old_states, old_actions)
             
             # match state_values tensor dimensions with rewards tensor
             state_values = torch.squeeze(state_values)
-
-            # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(logprobs - old_logprobs.detach())
             
-            # Finding Surrogate Loss:
+            # Finding the ratio (pi_theta / pi_theta__old)
+            ratios = torch.exp(logprobs - old_logprobs.detach())
+            # Finding Surrogate Loss
             advantages = rewards - state_values.detach()
-            # print("Shape of advantages: ", advantages.shape)    # 100
-            # print("Shape of ratios: ", ratios.shape)            # 200
-            # print("Shape old states: ", old_states.shape)       # 2, 200, 81
-            # print("Shape old actions: ", old_actions.shape)     # 200, 147
+            
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip,
                                 1+self.eps_clip) * advantages
@@ -132,8 +141,8 @@ class Agent:
             # Final loss
             loss = -torch.min(surr1, surr2) + 0.5 * \
                 self.MseLoss(state_values, rewards) - 0.01*dist_entropy
-            if _ % 5 == 0:
-                print('Epoches {} \t loss: {} \t '.format(_, loss.mean()))
+            if (i+1) % 5 == 0 or i == 0:
+                print('Epoches {} \t loss: {} \t '.format(i+1, loss.mean()))
 
             # take gradient step
             self.optimizer.zero_grad()

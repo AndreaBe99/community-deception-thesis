@@ -2,8 +2,8 @@
 import sys
 sys.path.append('../../')
 
-from src.agent.network import ActorCritic
-from src.agent.memory import Memory
+from src.agent.a2c.network import ActorCritic
+from src.agent.a2c.memory import Memory
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 from torch.nn.functional import pad

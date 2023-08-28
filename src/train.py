@@ -12,7 +12,7 @@ import sys
 sys.path.append("../")
 
 from src.agent.agent import Agent
-from src.agent.memory import Memory
+from src.agent.a2c.memory import Memory
 from src.environment.graph_env import GraphEnvironment
 from src.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
 

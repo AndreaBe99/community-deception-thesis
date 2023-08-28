@@ -2,9 +2,9 @@
 import sys
 sys.path.append('../../')
 
-from src.agent.actor import ActorNetwork
-from src.agent.critic import CriticNetwork
-from src.agent.memory import Memory
+from src.agent.a2c.actor import ActorNetwork
+from src.agent.a2c.critic import CriticNetwork
+from src.agent.a2c.memory import Memory
 from torch import nn
 from torch.distributions import MultivariateNormal
 

@@ -174,7 +174,7 @@ class GraphEnvironment(object):
         data : Data
             Graph after the duplicate edges have been removed
         """
-        # TODO: Remove duplicate edges, without reshaping the tensor
+        #TODO Remove duplicate edges, without reshaping the tensor
         # Reshape the edge_index tensor in N*2
         edge_index = data.edge_index.t().contiguous()
         # Remove the duplicate edges
@@ -188,7 +188,7 @@ class GraphEnvironment(object):
 
         Returns
         -------
-        Data
+        data: Data
             Graph after the reset
         """
         self.used_edge_budget = 0
@@ -222,20 +222,21 @@ class GraphEnvironment(object):
 
         # Get the index of the maximum value in the action list
         index = actions.index(max(actions))
+        
+        #° The number of possible actions is: 
+        #°      len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"])
+        #° So, if the index is less than the number of possible actions to add,
+        #° the action to apply is an action to add, otherwise it is an action to remove
         # Get the action to apply from self.possible_actions
-        # NOTE: the number of possible actions is: 
-        #   len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"])
-        # So, if the index is less than the number of possible actions to add,
-        # the action to apply is an action to add, otherwise it is an action to remove
         if index < len(self.possible_actions["ADD"]):
             action = self.possible_actions["ADD"][index]
         else:
             action = self.possible_actions["REMOVE"][index - len(self.possible_actions["ADD"])]
         
-        # TODO: Join th following code with the code above
-        # Check if the action is to add or to remove an edge
+        #TODO Join th following code with the code above
         if action == (-1,-1):
             budget_consumed = 0
+        # Check if the action is to add or to remove an edge
         elif action in self.possible_actions["REMOVE"]:
             self.graph.remove_edge(*action)
             # Replace the removed edge with (-1,-1) in the possible actions, 
@@ -356,7 +357,7 @@ class GraphEnvironment(object):
         
         # Compute the reward, using the deception score and the NMI score
         reward = self.get_reward(deception_score, nmi)
-        # TEST
+        #TEST
         reward -= self.old_rewards
         if abs(reward) < self.eps or budget_consumed == 0:
             reward = -1
@@ -367,4 +368,7 @@ class GraphEnvironment(object):
         self.used_edge_budget += (remaining_budget - updated_budget)
         
         data = self.delete_repeat_edges(from_networkx(self.graph))
+        
+        # adj_matrix = torch.tensor(nx.adjacency_matrix(self.graph).todense())
+        # adj_matrix = self.get_adj_matrix(data)
         return data, self.rewards

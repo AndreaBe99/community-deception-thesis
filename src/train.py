@@ -14,10 +14,11 @@ sys.path.append("../")
 from src.agent.agent import Agent
 from src.agent.memory import Memory
 from src.environment.graph_env import GraphEnvironment
-from src.utils import HyperParams, Utils, FilePaths
+from src.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
 
 # Environment parameters
 BETA = HyperParams.BETA.value
+DEBUG = HyperParams.DEBUG.value
 KAR_PATH = "../"+FilePaths.KARATE_PATH.value
 
 # Agent parameters
@@ -43,7 +44,7 @@ ENV_NAME = "karate"
 
 if __name__ == "__main__":
     # Define the environment
-    env = GraphEnvironment(BETA)
+    env = GraphEnvironment(beta=BETA, debug=False)
     # Load the graph from the dataset folder
     kar = Utils.import_mtx_graph(KAR_PATH)
     
@@ -53,13 +54,20 @@ if __name__ == "__main__":
     # Community to hide, from community_detection.ipynb file
     community_target = [4, 5, 6, 10, 16]
     # Setup the environment, by default we use the Louvain algorithm for detection
-    env.setup(graph=kar, community=community_target, training=True)
+    env.setup(
+        graph=kar, 
+        community=community_target, 
+        training=True, 
+        community_detection_algorithm=DetectionAlgorithms.WALK.value)
     
     # G_IN_SIZE = kar.number_of_nodes()
     # Get list of possible actions
     possible_actions = env.get_possible_actions(kar, community_target)
     NUM_ACTIONS = len(possible_actions["ADD"]) + len(possible_actions["REMOVE"])
-    print("Number of possible actions: ", NUM_ACTIONS)
+    
+    if env.debug:
+        print("Number of possible actions: ", NUM_ACTIONS)
+        
     # Define the agent
     agent = Agent(
         state_dim=G_IN_SIZE, 
@@ -84,12 +92,23 @@ if __name__ == "__main__":
     avg_length = 0
     time_step = 0
     
+    if env.debug:
+        MAX_EPISODES = 10      # FOR TEST
+    
     # Training loop
     for episode in range(1, MAX_EPISODES + 1):
         state = env.reset()
         done = False
         
+        print("#" * 16, "START EPISODE:", episode , "#" * 16)
+
         for t in range(MAX_TIMESTEPS):
+            
+            # If the budget for the graph rewiring is exhausted, stop the episode
+            if env.used_edge_budget == env.edge_budget - 1:
+                print("-" * 10, "\tBudget exhausted\t", "-" * 9)
+                done = True
+            
             time_step += 1
             # Running policy_old:
             action = agent.select_action(state.edge_index, memory)
@@ -101,24 +120,13 @@ if __name__ == "__main__":
             
             # Update if its time
             if time_step % UPDATE_TIMESTEP == 0:
-                print("-*" * 10, "start training the RL agent", "-*" * 10)
+                print("-" * 10, "Start training the RL agent ", "-" * 10)
                 agent.update(memory)
                 memory.clear_memory()
                 time_step = 0
-                print("-*" * 10, "start search the pruning policies", "-*" * 10)
+                print("-" * 50)
             
             running_reward += reward
-            
-            # If the budget for the graph rewiring is exhausted, stop the episode
-            if env.exhausted_budget:
-                print("Budget exhausted")
-                done = True
-
-            # if time_step == MAX_TIMESTEPS:
-            #    if not done:
-            #        print("Max timestep reached, but not done")
-            #        reward = -100
-            #        done = True
             
             if done:
                 break
@@ -145,6 +153,13 @@ if __name__ == "__main__":
             avg_length = int(avg_length / LOG_INTERVAL)
             running_reward = int((running_reward / LOG_INTERVAL))
             
-            print('Episode {} \t avg length: {} \t reward: {}'.format(episode, avg_length, running_reward))
+            print("*"*50)
+            print('* Episode {} \t avg length: {} \t reward: {}'.format(episode, avg_length, running_reward))
+            print("*"*50)
             running_reward = 0
-            avg_length = 0        
+            avg_length = 0     
+        
+        if env.debug:
+            env.plot_graph()
+        
+        print("\n")

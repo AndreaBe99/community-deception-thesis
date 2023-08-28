@@ -28,9 +28,30 @@ class GraphEncoder(nn.Module):
         embedding = global_mean_pool(x, batch)
         embedding = self.linear1(embedding)
         embedding = self.tanh(embedding)
+        return embedding
+
+    #° GCNConv takes as input the edge list and NOT the adjacency matrix
+    #° this is a  problem because when we update the Agent's policy, we need to
+    #° stack all the old states, and if we use as state the edge list, we will
+    #° have a different number of edges for each state, and we cannot stack them
+    #° in a tensor. So, we need to pad the edge list with -1, but it is not
+    #° a good solution.
+    
+    #! All class from MessagePassing take as input the edge list and NOT the 
+    #! adjacency matrix, since they can explode in size with a large number of nodes!
+    def test_forward(self, adj_matrix: torch.Tensor)-> torch.Tensor:
+        n_nodes = adj_matrix.shape[0]
+        x = torch.randn([n_nodes, 50])
+        batch = torch.zeros(n_nodes).long()
+
+        x = self.conv1(x, adj_matrix)
+        x = self.relu(x)
+        embedding = global_mean_pool(x, batch)
+        embedding = self.linear1(embedding)
+        embedding = self.tanh(embedding)
 
         return embedding
-    
+
     """
     def forward(self, graph: Data)-> torch.Tensor:
         # Features Matrix

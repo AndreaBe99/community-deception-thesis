@@ -112,6 +112,8 @@ if __name__ == "__main__":
             time_step += 1
             # Running policy_old:
             action = agent.select_action(state.edge_index, memory)
+            #TEST # state is the adjacency matrix
+            # action = agent.select_action(state, memory) 
             state, reward = env.step(action[0])
             
             # Saving reward and is_terminals:

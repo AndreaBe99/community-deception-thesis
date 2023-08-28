@@ -59,4 +59,6 @@ Paper about graph rewiring using reinforcement learning:
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 ```
+
+They use a Structure2Vec model to encode the graph structure and obtain an embedding. The embedding is then used as input for a DQN that outputs the action to take.
 ‌

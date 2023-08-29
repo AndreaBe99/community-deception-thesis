@@ -29,12 +29,15 @@ class NormalizedMutualInformation(object):
             Confusion matrix
         """
         confusion_matrix = Counter()
-        # TODO: avoid to process the same community twice, using: processed_new = set()
+        #° Avoid to process the same community twice
+        processed_new = set()
         for i, old in enumerate(communities_old):
             for j, new in enumerate(communities_new):
-                intersection = len(set(old) & set(new))
-                confusion_matrix[(i, j)] = intersection
-
+                if j not in processed_new:
+                    intersection = len(set(old) & set(new))
+                    confusion_matrix[(i, j)] = intersection
+                    if intersection > 0:
+                        processed_new.add(j)
         return confusion_matrix
 
     @staticmethod

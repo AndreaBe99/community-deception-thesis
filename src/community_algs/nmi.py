@@ -30,14 +30,15 @@ class NormalizedMutualInformation(object):
         """
         confusion_matrix = Counter()
         #° Avoid to process the same community twice
-        processed_new = set()
+        #BUG ZeroDivisionError if we use this optimization
+        #BUG processed_new = set()
         for i, old in enumerate(communities_old):
             for j, new in enumerate(communities_new):
-                if j not in processed_new:
-                    intersection = len(set(old) & set(new))
-                    confusion_matrix[(i, j)] = intersection
-                    if intersection > 0:
-                        processed_new.add(j)
+                #BUG if j not in processed_new:
+                intersection = len(set(old) & set(new))
+                confusion_matrix[(i, j)] = intersection
+                #BUG    if intersection > 0:
+                #BUG        processed_new.add(j)
         return confusion_matrix
 
     @staticmethod

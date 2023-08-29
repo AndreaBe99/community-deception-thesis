@@ -95,7 +95,6 @@ class GraphEncoder(nn.Module):
         # Each row of the tensor represents an edge in the graph.
         # edge_index = graph.edge_index
         
-        # TODO: Remove duplicate edges, without reshaping the tensor
         # Reshape the edge_index tensor in N*2
         edge_index = edge_index.t().contiguous()
         # Remove the duplicate edges

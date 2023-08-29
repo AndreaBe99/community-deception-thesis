@@ -93,7 +93,8 @@ if __name__ == "__main__":
     time_step = 0
     
     if env.debug:
-        MAX_EPISODES = 10      # FOR TEST
+        #TEST test with a low number of episodes
+        MAX_EPISODES = 10
     
     # Training loop
     for episode in range(1, MAX_EPISODES + 1):
@@ -112,8 +113,8 @@ if __name__ == "__main__":
             time_step += 1
             # Running policy_old:
             action = agent.select_action(state.edge_index, memory)
-            #TEST # state is the adjacency matrix
-            # action = agent.select_action(state, memory) 
+            #TEST state is the adjacency matrix
+            #TEST action = agent.select_action(state, memory) 
             state, reward = env.step(action[0])
             
             # Saving reward and is_terminals:

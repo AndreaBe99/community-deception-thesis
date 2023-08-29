@@ -14,7 +14,7 @@ sys.path.append("../")
 from src.agent.agent import Agent
 from src.agent.a2c.memory import Memory
 from src.environment.graph_env import GraphEnvironment
-from src.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
+from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
 
 # Environment parameters
 BETA = HyperParams.BETA.value

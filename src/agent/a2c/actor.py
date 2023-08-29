@@ -6,7 +6,7 @@ import os
 import sys
 sys.path.append('../../')
 
-from src.utils import FilePaths
+from src.utils.utils import FilePaths
 from src.embedding.graph_encoder import GraphEncoder
 
 

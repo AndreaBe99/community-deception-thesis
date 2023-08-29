@@ -2,7 +2,7 @@
 import sys
 sys.path.append('../../')
 
-from src.utils import DetectionAlgorithms
+from src.utils.utils import DetectionAlgorithms
 
 from typing import List
 

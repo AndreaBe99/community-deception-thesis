@@ -4,8 +4,8 @@ sys.path.append('../../')
 from src.community_algs.nmi import NormalizedMutualInformation
 from src.community_algs.deception_score import DeceptionScore
 from src.community_algs.detection_algs import DetectionAlgorithm
-from src.utils import DetectionAlgorithms
-from src.utils import HyperParams
+from src.utils.utils import DetectionAlgorithms
+from src.utils.utils import HyperParams
 
 from torch_geometric.utils import from_networkx
 from torch_geometric.data import Data
@@ -52,7 +52,7 @@ class GraphEnvironment(object):
         self.training = None
         self.rewards = None
         
-        # Test
+        #TEST
         self.old_rewards = 0
         
         self.edge_budget = None

@@ -30,6 +30,7 @@ class ActorNetwork(nn.Module):
         self.linear2 = nn.Linear(hidden_size, nb_actions)
         self.nb_actions = nb_actions
         self.tanh = nn.Tanh()
+        #TODO try with a Softmax
         self.relu = nn.ReLU()
 
         self.device = torch.device(

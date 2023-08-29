@@ -21,6 +21,7 @@ class CriticNetwork(nn.Module):
         self.graph_encoder_critic = GraphEncoder(
             g_in_size, g_hidden_size, g_embedding_size)
         self.linear1 = nn.Linear(g_embedding_size, 1)
+        #TODO try with a Softmax
         self.tanh = nn.Tanh()
         # self.sigmoid = nn.Sigmoid()
 

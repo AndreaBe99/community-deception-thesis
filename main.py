@@ -9,12 +9,10 @@ os.environ['DGLBACKEND'] = 'pytorch'
 if __name__ == "__main__":
     print("*"*20, "Setup Information", "*"*20)
 
-    # ° ------ Graph Setup ------ °#
-    # Karate Club graph
-    # graph_path = FilePaths.KARATE_PATH.value
-    # Dolphins graph
+    # ° ------ Graph Setup ------ ° #
+    # ! Graph path (change the following line to change the graph)
     graph_path = FilePaths.DOLPHIN_PATH.value
-    
+    # Set the environment name as the graph name
     env_name = graph_path.split("/")[-1].split(".")[0]
     # Load the graph from the dataset folder
     graph = Utils.import_mtx_graph(graph_path)
@@ -22,23 +20,16 @@ if __name__ == "__main__":
     print("* Graph Name:", env_name)
     print("*", graph)
 
-    # ° --- Environment Setup --- °#
+    # ° --- Environment Setup --- ° #
     # Define beta, i.e. the percentage of edges to add/remove
     beta = HyperParams.BETA.value
-    
-    # Define the target community
-    # NOTE: We get the community list from the notebook/community_detection.ipynb
-    # ! KARATE CLUB graph
-    #community_target = [4, 5, 6, 10, 16]
-    # ! DOLPHINS graph
-    community_target = [0, 2, 10, 42, 47, 53, 61]
-    
-    # Define the detection algorithm to use
-    # Walktrap for karate club
-    # detection_alg = DetectionAlgorithms.WALK.value
-    # Louvain for dolphins
-    detection_alg = DetectionAlgorithms.LOUV.value
-    
+    # ! Define the detection algorithm to use (change the following line to change the algorithm)
+    detection_alg = DetectionAlgorithms.WALK.value
+    # Apply the community detection algorithm on the graph
+    dct = DetectionAlgorithms(detection_alg)
+    community_structure = dct.compute_community(graph)
+    # Choose one of the communities found by the algorithm
+    community_target = community_structure[0]
     
     # Define the environment and the number of possible actions
     env = GraphEnvironment(beta=beta, debug=False)
@@ -53,7 +44,7 @@ if __name__ == "__main__":
     n_actions = len(possible_actions["ADD"]) + len(possible_actions["REMOVE"])
     print("* Number of possible actions:", n_actions)
 
-    # ° ------ Agent Setup ------ °#
+    # ° ------ Agent Setup ------ ° #
     # Dimensions of the state
     state_dim = HyperParams.G_IN_SIZE.value
     # Number of possible actions
@@ -99,7 +90,7 @@ if __name__ == "__main__":
     #     np.random.seed(random_seed)
     print("*"*20, "End Information", "*"*20, "\n")
 
-    # ° ------ Model Training ------ °#
+    # ° ------ Model Training ------ ° #
     # Set the maximum number of steps per episode to the double of the edge budget
     max_timesteps = env.edge_budget*2
     # Set the update timestep to 10 times then edge budget

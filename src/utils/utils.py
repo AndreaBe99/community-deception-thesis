@@ -120,8 +120,21 @@ class FilePaths(Enum):
     # CHKPT_DIR  = 'tmp/rl'
     LOG_DIR    = 'src/logs/'
     DATASETS_DIR = 'dataset/data'
-    KARATE_PATH = DATASETS_DIR + '/kar.mtx'
-    DOLPHIN_PATH = DATASETS_DIR + '/dol.mtx'
+    # Dataset file paths
+    KAR = DATASETS_DIR + '/kar.mtx'
+    DOL = DATASETS_DIR + '/dol.mtx'
+    MAD = DATASETS_DIR + '/mad.mtx'
+    LESM = DATASETS_DIR + '/lesm.mtx'
+    POLB = DATASETS_DIR + '/polb.mtx'
+    WORDS = DATASETS_DIR + '/words.mtx'
+    ERDOS = DATASETS_DIR + '/erdos.mtx'
+    POW = DATASETS_DIR + '/pow.mtx'
+    FB_75 = DATASETS_DIR + '/fb-75.mtx'
+    DBLP = DATASETS_DIR + '/dblp.mtx'
+    ASTR = DATASETS_DIR + '/astr.mtx'
+    AMZ = DATASETS_DIR + '/amz.mtx'
+    YOU = DATASETS_DIR + '/you.mtx'
+    ORK = DATASETS_DIR + '/ork.mtx'
 
 class HyperParams(Enum):
     """

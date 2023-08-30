@@ -12,13 +12,14 @@ To install requirements:
 pip install -r requirements.txt
 ```
 
+To install **Deep Graph Library** (`dgl`) for your system, follow the instructions [here](<https://www.dgl.ai/pages/start.html>).
+
 ## Training
 
 To train the model, run the following command:
 
 ```bash
-cd src
-python train.py
+python main.py
 ```
 
 ## References

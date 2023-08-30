@@ -1,4 +1,5 @@
 from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
+from src.community_algs.detection_algs import DetectionAlgorithm
 from src.environment.graph_env import GraphEnvironment
 from src.agent.a2c.memory import Memory
 from src.agent.agent import Agent
@@ -11,7 +12,7 @@ if __name__ == "__main__":
 
     # ° ------ Graph Setup ------ ° #
     # ! Graph path (change the following line to change the graph)
-    graph_path = FilePaths.DOLPHIN_PATH.value
+    graph_path = FilePaths.KAR.value
     # Set the environment name as the graph name
     env_name = graph_path.split("/")[-1].split(".")[0]
     # Load the graph from the dataset folder
@@ -26,10 +27,12 @@ if __name__ == "__main__":
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
     detection_alg = DetectionAlgorithms.WALK.value
     # Apply the community detection algorithm on the graph
-    dct = DetectionAlgorithms(detection_alg)
+    dct = DetectionAlgorithm(detection_alg)
     community_structure = dct.compute_community(graph)
     # Choose one of the communities found by the algorithm
     community_target = community_structure[0]
+    print("* Community Detection Algorithm:", detection_alg)
+    print("* Community Target:", community_target)
     
     # Define the environment and the number of possible actions
     env = GraphEnvironment(beta=beta, debug=False)

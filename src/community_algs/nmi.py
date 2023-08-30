@@ -1,8 +1,7 @@
 # Typing Hinting
 from typing import List, Tuple
-
-# Misc
 from collections import Counter
+
 import math
 
 class NormalizedMutualInformation(object):

@@ -1,17 +1,12 @@
 """Module for community detection algorithms"""
-import sys
-sys.path.append('../../')
-
+# import sys
+# sys.path.append('../../')
 from src.utils.utils import DetectionAlgorithms
-
 from typing import List
 
 import os
-
 import networkx as nx
 import igraph as ig
-
-# Plotting
 import matplotlib.pyplot as plt
 plt.style.use('default')
 

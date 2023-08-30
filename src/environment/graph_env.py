@@ -1,21 +1,20 @@
 """Module for the GraphEnviroment class"""
-import sys 
-sys.path.append('../../')
 from src.community_algs.nmi import NormalizedMutualInformation
 from src.community_algs.deception_score import DeceptionScore
 from src.community_algs.detection_algs import DetectionAlgorithm
 from src.utils.utils import DetectionAlgorithms
 from src.utils.utils import HyperParams
-
 from torch_geometric.utils import from_networkx
 from torch_geometric.data import Data
 from typing import List, Tuple
+# from torch_geometric.data import DataLoader
+
 import math
 import numpy as np
 import networkx as nx
 import torch
-
-
+# import sys 
+# sys.path.append('../../')
 
 class GraphEnvironment(object):
     """Enviroment where the agent will act, it will be a graph with a community"""
@@ -40,6 +39,10 @@ class GraphEnvironment(object):
         # Setup later, with the setup function
         self.graph = None
         self.graph_copy = None
+        
+        # TEST Use a variable to store the Data graph object
+        self.data_pyg = None
+        
         self.deception = None
         self.detection = None
         # Community to hide
@@ -156,6 +159,7 @@ class GraphEnvironment(object):
         plt.show()
         
 
+    #TODO This function is not used anymore, since we use DGL instead of PyG
     def delete_repeat_edges(self, data: Data) -> torch.Tensor:
         """The Data object contains the edge_index tensor, which is a tensor
         of size 2*N, where N is the number of edges. The first row of the tensor
@@ -188,8 +192,8 @@ class GraphEnvironment(object):
 
         Returns
         -------
-        data: Data
-            Graph after the reset
+        adj_matrix : torch.Tensor
+            Adjacency matrix of the graph
         """
         self.used_edge_budget = 0
         self.exhausted_budget = False
@@ -198,16 +202,20 @@ class GraphEnvironment(object):
             self.graph, self.community_target)
         # self.rewards = 0.0
         
+        # Return a PyG Data object
         data = self.delete_repeat_edges(from_networkx(self.graph))
+        data.x = torch.randn([data.num_nodes, 50])
+        data.batch = torch.zeros(data.num_nodes).long()
+        self.data_pyg = data
         return data
     
-    def apply_action(self, actions: List[float])->int:
+    def apply_action(self, actions: np.array)->int:
         """Applies the action to the graph, if there is an edge between the two 
         nodes, it removes it, otherwise it adds it
 
         Parameters
         ----------
-        actions : List[float]
+        actions : np.array
             List of possible actions, where each element is a real number
             between 0 and 1
         
@@ -221,8 +229,7 @@ class GraphEnvironment(object):
         #   - If there is no edge, it means that the action is to add it 
 
         # Get the index of the maximum value in the action list
-        index = actions.index(max(actions))
-        
+        index = np.argmax(actions)
         #° The number of possible actions is: 
         #°      len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"])
         #° So, if the index is less than the number of possible actions to add,
@@ -309,18 +316,18 @@ class GraphEnvironment(object):
         self.possible_actions = self.get_possible_actions(
             self.graph, self.community_target)
         
-    def step(self, actions: List[float]) -> Tuple[Data, float]:
+    def step(self, actions: np.array) -> Tuple[Data, float]:
         """Step function for the environment
 
         Parameters
         ----------
-        actions : List[float]
+        actions : np.array
             Actions to take on the graph, which is a list longer as the number
             of possible actions, where each element is a real number between
-            0 and 1
+            0 and 1.
         Returns
         -------
-        self.graph, self.rewards: Tuple[Data, float]
+        self.graph, self.rewards: Tuple[torch.Tensor, float]
             Tuple containing the new graph and the reward 
         """
         
@@ -357,18 +364,19 @@ class GraphEnvironment(object):
         
         # Compute the reward, using the deception score and the NMI score
         reward = self.get_reward(deception_score, nmi)
-        #TEST
-        reward -= self.old_rewards
-        if abs(reward) < self.eps or budget_consumed == 0:
-            reward = -1
+        #TEST Subtract the old reward from the new reward 
+        # reward -= self.old_rewards
+        if abs(reward) < self.eps:
+            reward = 0
         self.rewards = reward
-        self.old_rewards = reward
+        # self.old_rewards = reward
         
         # Update the used edge budget
         self.used_edge_budget += (remaining_budget - updated_budget)
         
+        # Return a PyG Data object
         data = self.delete_repeat_edges(from_networkx(self.graph))
-        
-        # adj_matrix = torch.tensor(nx.adjacency_matrix(self.graph).todense())
-        # adj_matrix = self.get_adj_matrix(data)
+        data.x = self.data_pyg.x
+        data.batch = self.data_pyg.batch
+        self.data_pyg = data
         return data, self.rewards

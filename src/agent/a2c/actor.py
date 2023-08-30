@@ -1,14 +1,14 @@
 """Module for the Actor Network"""
+from src.utils.utils import FilePaths
+from src.embedding.graph_encoder import GraphEncoder
+from torch_geometric.data import Data
 from torch import nn
+
 import torch
 import os
 
-import sys
-sys.path.append('../../')
-
-from src.utils.utils import FilePaths
-from src.embedding.graph_encoder import GraphEncoder
-
+# import sys
+# sys.path.append('../../')
 
 class ActorNetwork(nn.Module):
     """Actor Network"""
@@ -20,7 +20,7 @@ class ActorNetwork(nn.Module):
             g_embedding_size,
             hidden_size,
             nb_actions,
-            chkpt_dir=FilePaths.CHKPT_DIR.value):
+            chkpt_dir=FilePaths.LOG_DIR.value):
         super(ActorNetwork, self).__init__()
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_rl')
@@ -30,17 +30,21 @@ class ActorNetwork(nn.Module):
         self.linear2 = nn.Linear(hidden_size, nb_actions)
         self.nb_actions = nb_actions
         self.tanh = nn.Tanh()
-        #TODO try with a Softmax
         self.relu = nn.ReLU()
+        
+        #TODO try with a Softmax
+        self.softmax = nn.Softmax(dim=1)
 
         self.device = torch.device(
             'cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
-    def forward(self, state: torch.Tensor):
+    def forward(self, state: Data):
         g = self.graph_encoder(state)
         actions = self.relu(self.linear1(g))
-        actions = self.tanh(self.linear2(actions))
+        # actions = self.tanh(self.linear2(actions))
+        actions = self.softmax(self.linear2(actions))
+        
         return actions
 
     def save_checkpoint(self):

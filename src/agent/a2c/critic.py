@@ -1,12 +1,10 @@
-from torch import nn
-import torch
-import os
-
-import sys
-sys.path.append('../../')
-
 from src.utils.utils import FilePaths
 from src.embedding.graph_encoder import GraphEncoder
+from torch_geometric.data import Data
+from torch import nn
+
+import torch
+import os
 
 class CriticNetwork(nn.Module):
     def __init__(
@@ -14,14 +12,13 @@ class CriticNetwork(nn.Module):
         g_in_size,
         g_hidden_size,
         g_embedding_size,
-        chkpt_dir=FilePaths.CHKPT_DIR.value):
+        chkpt_dir=FilePaths.LOG_DIR.value):
         super(CriticNetwork, self).__init__()
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_rl')
         self.graph_encoder_critic = GraphEncoder(
             g_in_size, g_hidden_size, g_embedding_size)
         self.linear1 = nn.Linear(g_embedding_size, 1)
-        #TODO try with a Softmax
         self.tanh = nn.Tanh()
         # self.sigmoid = nn.Sigmoid()
 
@@ -30,7 +27,7 @@ class CriticNetwork(nn.Module):
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
-    def forward(self, state):
+    def forward(self, state: Data):
         g = self.graph_encoder_critic(state)
         value = self.tanh(self.linear1(g))
         return value

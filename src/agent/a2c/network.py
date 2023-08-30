@@ -1,16 +1,16 @@
 """Module for the ActorCritic class"""
-import sys
-sys.path.append('../../')
-
 from src.agent.a2c.actor import ActorNetwork
 from src.agent.a2c.critic import CriticNetwork
 from src.agent.a2c.memory import Memory
-from torch import nn
+
 from torch.distributions import MultivariateNormal
+from torch_geometric.data import Data
 
 from typing import Tuple
+from torch import nn
 
 import torch
+
 
 class ActorCritic(nn.Module):
     """ActorCritic Network"""
@@ -41,7 +41,10 @@ class ActorCritic(nn.Module):
         """Forward pass"""
         raise NotImplementedError
 
-    def act(self, state: torch.Tensor, memory: Memory)-> Tuple[torch.Tensor, torch.Tensor]:
+    def act(
+        self, 
+        state: Data,
+        memory: Memory)-> Tuple[torch.Tensor, torch.Tensor]:
         """
         Compute the action to take given the current state
 
@@ -58,6 +61,7 @@ class ActorCritic(nn.Module):
             The action to take and the log probability of the action
         """
         action_mean = self.actor(state)
+        
         cov_mat = torch.diag(self.action_var).to(self.device)
 
         dist = MultivariateNormal(action_mean, cov_mat)
@@ -68,8 +72,8 @@ class ActorCritic(nn.Module):
         memory.actions.append(action)
         memory.logprobs.append(action_logprob)
 
-        # return action.detach()
-        return action.detach(), action_logprob.detach()
+        return action.detach()
+        #return action.detach(), action_logprob.detach()
     
     def evaluate(self, state: torch.Tensor, action)-> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """

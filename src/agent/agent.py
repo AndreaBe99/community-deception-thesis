@@ -1,17 +1,19 @@
 """Module for the agent class"""
-import sys
-sys.path.append('../../')
-
 from src.agent.a2c.network import ActorCritic
 from src.agent.a2c.memory import Memory
+
+from torch_geometric.data import Data
+from torch_geometric.data import Batch
 from torch import nn
-from torch.nn.utils.rnn import pad_sequence
-from torch.nn.functional import pad
 
 import torch
 
+
 class Agent:
     def __init__(self, state_dim, action_dim, action_std, lr, gamma, K_epochs, eps_clip):
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.action_std = action_std
         self.lr = lr
         # self.betas = betas
         self.gamma = gamma
@@ -34,7 +36,7 @@ class Agent:
 
         self.MseLoss = nn.MSELoss()
 
-    def select_action(self, state: torch.Tensor, memory: Memory)-> list:
+    def select_action(self, state: Data, memory: Memory,) -> list:
         """
         Select an action given the current state
 
@@ -52,16 +54,13 @@ class Agent:
         """
         #  # state = torch.FloatTensor(state.reshape(1, -1)).to(device)
         # ! OLD
-        # return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
+        return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
         
         # ! NEW
-        with torch.no_grad():
-            # state = torch.FloatTensor(state).to(device)
-            action, action_logprob = self.policy_old.act(state, memory)
-        # memory.states.append(state)
-        # memory.actions.append(action)
-        # memory.logprobs.append(action_logprob)
-        return action.tolist()
+        # with torch.no_grad():
+        #    # state = torch.FloatTensor(state).to(device)
+        #    action, action_logprob = self.policy_old.act(state, memory)
+        #return action.tolist()
             
     def update(self, memory: Memory):
         """
@@ -89,29 +88,17 @@ class Agent:
         
         # Normalizing the rewards
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
-        # ! OLD
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        # ! NEW
-        # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
 
         # Prepares the data for training the policy network. 
         # The memory object contains lists of states, actions, log probabilities, 
         # and rewards for each time step in the episode.
-        # ! OLD
-        # old_states = memory.states
-        # old_actions = torch.squeeze(torch.stack(memory.actions).to(self.device), 1).detach()
-        # old_logprobs = torch.squeeze(torch.stack(memory.logprobs), 1).to(self.device).detach()
-        # ! NEW
-        # Find the maximum size of the tensors in memory.states
-        max_size = max([s.size() for s in memory.states])
-        # Pad all tensors to the maximum size
-        padded_states = [pad(s, (-1, max_size[1]-s.size(1), 0, max_size[0]-s.size(0))) for s in memory.states]
-        # padded_states = pad_sequence(memory.states, batch_first=True, padding_value=-1)
         
-        old_states = torch.squeeze(torch.stack(padded_states, dim=1)).detach().to(self.device)
+        # Each state is a PyG Data object
+        old_states = Batch.from_data_list(memory.states).to(self.device)
         old_actions = torch.squeeze(torch.stack(memory.actions, dim=1)).detach().to(self.device)
         old_logprobs = torch.squeeze(torch.stack(memory.logprobs, dim=1)).detach().to(self.device)
-                
+        
         # Optimize policy for K epochs
         for i in range(self.K_epochs):
             
@@ -138,11 +125,14 @@ class Agent:
             surr2 = torch.clamp(ratios, 1-self.eps_clip,
                                 1+self.eps_clip) * advantages
             
-            # Final loss
-            loss = -torch.min(surr1, surr2) + 0.5 * \
-                self.MseLoss(state_values, rewards) - 0.01*dist_entropy
+            # Final loss: first term is Actor Loss, second term is Critic Loss
+            act_loss = -torch.min(surr1, surr2) 
+            crt_loss = self.MseLoss(state_values, rewards) * 0.5
+            ent_loss = dist_entropy * 0.01
+            loss = act_loss + crt_loss - ent_loss # Want to maximize
+            
             if (i+1) % 5 == 0 or i == 0:
-                print('Epoches {} \t loss: {} \t '.format(i+1, loss.mean()))
+                print('* Epoches {} \t loss: {} \t '.format(i+1, loss.mean()))
 
             # take gradient step
             self.optimizer.zero_grad()

@@ -1,168 +1,150 @@
-from torch_geometric.utils import from_networkx
-
-import networkx as nx
-import torch
-import torch_geometric
-
-import logging
-
-import numpy as np
-
-import sys
-sys.path.append("../")
-
 from src.agent.agent import Agent
 from src.agent.a2c.memory import Memory
 from src.environment.graph_env import GraphEnvironment
-from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
+from src.utils.utils import HyperParams, FilePaths, Utils
+from typing import List, Tuple
 
-# Environment parameters
-BETA = HyperParams.BETA.value
-DEBUG = HyperParams.DEBUG.value
-KAR_PATH = "../"+FilePaths.KARATE_PATH.value
+import torch
 
-# Agent parameters
-G_IN_SIZE = HyperParams.G_IN_SIZE.value
-ACTION_STD = HyperParams.ACTION_STD.value
-EPS_CLIP = HyperParams.EPS_CLIP.value
-LR = HyperParams.LR.value
-GAMMA = HyperParams.GAMMA.value
-K_EPOCHS = HyperParams.K_EPOCHS.value
+def train(
+    env: GraphEnvironment,
+    agent: Agent,
+    memory: Memory,
+    max_episodes: int = HyperParams.MAX_EPISODES.value,
+    max_timesteps: int = HyperParams.MAX_TIMESTEPS.value,
+    update_timesteps: int = HyperParams.UPDATE_TIMESTEP.value,
+    log_interval: int = HyperParams.LOG_INTERVAL.value,
+    solved_reward: float = HyperParams.SOLVED_REWARD.value,
+    save_model: int = HyperParams.SAVE_MODEL.value,
+    log_dir: str = FilePaths.LOG_DIR.value,
+    env_name: str = "Default") -> Tuple[List[float], List[int]]:
+    """
+    Function to train the agent
 
-# Hyperparameters for the training loop
-SOLVED_REWARD = HyperParams.SOLVED_REWARD.value
-LOG_INTERVAL = HyperParams.LOG_INTERVAL.value
-MAX_EPISODES = HyperParams.MAX_EPISODES.value
-MAX_TIMESTEPS = HyperParams.MAX_TIMESTEPS.value
-UPDATE_TIMESTEP = HyperParams.UPDATE_TIMESTEP.value
-RANDOM_SEED = None
-
-# Name of the graph environment
-ENV_NAME = "karate"
-
-
-
-if __name__ == "__main__":
-    # Define the environment
-    env = GraphEnvironment(beta=BETA, debug=False)
-    # Load the graph from the dataset folder
-    kar = Utils.import_mtx_graph(KAR_PATH)
+    Parameters
+    ----------
+    max_episodes : int, optional
+        Number of episodes,by default HyperParams.MAX_EPISODES.value
+    max_timesteps : int, optional
+        Number of timesteps, by default HyperParams.MAX_TIMESTEPS.value
+    update_timesteps : int, optional
+        Number of timesteps to update the policy, by default HyperParams.UPDATE_TIMESTEP.value
+    log_interval : int, optional
+        Interval for logging, by default HyperParams.LOG_INTERVAL.value
+    solved_reward : float, optional
+        Stop training if the reward is greater than this value, by default HyperParams.SOLVED_REWARD.value
+    save_model : int, optional
+        Each save_model episodes save the model, by default HyperParams.SAVE_MODEL.value
+    log_dir : str, optional
+        Directory for logging, by default FilePaths.LOG_DIR.value
+    env_name : str, optional
+        Environment name, by default "Default"
     
-    # Print the graph
-    print("Info on '{}' graph: ".format(ENV_NAME), kar)
-    
-    # Community to hide, from community_detection.ipynb file
-    community_target = [4, 5, 6, 10, 16]
-    # Setup the environment, by default we use the Louvain algorithm for detection
-    env.setup(
-        graph=kar, 
-        community=community_target, 
-        training=True, 
-        community_detection_algorithm=DetectionAlgorithms.WALK.value)
-    
-    # G_IN_SIZE = kar.number_of_nodes()
-    # Get list of possible actions
-    possible_actions = env.get_possible_actions(kar, community_target)
-    NUM_ACTIONS = len(possible_actions["ADD"]) + len(possible_actions["REMOVE"])
-    
-    if env.debug:
-        print("Number of possible actions: ", NUM_ACTIONS)
-        
-    # Define the agent
-    agent = Agent(
-        state_dim=G_IN_SIZE, 
-        action_dim=NUM_ACTIONS, 
-        action_std=ACTION_STD, 
-        lr=LR,
-        gamma=GAMMA, 
-        K_epochs=K_EPOCHS, 
-        eps_clip=EPS_CLIP)
-    
-    if RANDOM_SEED:
-        print("Random Seed: {}".format(RANDOM_SEED))
-        torch.manual_seed(RANDOM_SEED)
-        env.seed(RANDOM_SEED)
-        np.random.seed(RANDOM_SEED)
-    
-    # Define Memory
-    memory = Memory()
-    
+    Returns
+    -------
+    Tuple[List[float], List[int]]
+        Average reward for each episode and the length of each episode
+    """
     # Logging Variables
     running_reward = 0
     avg_length = 0
     time_step = 0
     
-    if env.debug:
-        #TEST test with a low number of episodes
-        MAX_EPISODES = 10
+    episodes_avg_rewards = []
+    episodes_length = []
     
     # Training loop
-    for episode in range(1, MAX_EPISODES + 1):
+    for episode in range(1, max_episodes + 1):
+        # Reset the environment at each episode, state is a PyG Data object
         state = env.reset()
         done = False
-        
-        print("#" * 16, "START EPISODE:", episode , "#" * 16)
+        print("*" * 20, "Start Episode", episode, "*" * 20)
 
-        for t in range(MAX_TIMESTEPS):
-            
+        avg_episode_reward = 0
+        avg_episode_timesteps = 0
+        for t in range(max_timesteps):
             # If the budget for the graph rewiring is exhausted, stop the episode
             if env.used_edge_budget == env.edge_budget - 1:
-                print("-" * 10, "\tBudget exhausted\t", "-" * 9)
+                print("*", "-" * 19, "Budget exhausted", "-" * 19)
                 done = True
-            
             time_step += 1
-            # Running policy_old:
-            action = agent.select_action(state.edge_index, memory)
-            #TEST state is the adjacency matrix
-            #TEST action = agent.select_action(state, memory) 
-            state, reward = env.step(action[0])
-            
-            # Saving reward and is_terminals:
+            #° Running policy_old, return a distribution over the actions
+            actions = agent.select_action(state, memory)
+            #° Perform the step on the environment, i.e. add or remove an edge
+            state, reward = env.step(actions)
+            #° Saving reward and is_terminals
             memory.rewards.append(reward)
             memory.is_terminals.append(done)
-            
-            # Update if its time
-            if time_step % UPDATE_TIMESTEP == 0:
-                print("-" * 10, "Start training the RL agent ", "-" * 10)
+            #° Update policy if its time
+            if time_step % update_timesteps == 0:
+                print("*", "-" * 13, "Start training the RL agent ", "-" * 13)
                 agent.update(memory)
                 memory.clear_memory()
                 time_step = 0
-                print("-" * 50)
-            
+                print("*", "-"*14, "End training the RL agent ", "-"*14)
+            # Add the reward to the running reward
             running_reward += reward
-            
+            # Update the average episode reward and timesteps
+            avg_episode_reward += reward
+            avg_episode_timesteps += 1
+            # Check if the episode is done
             if done:
                 break
-
-        avg_length += t
-        
-        LOG_DIR = FilePaths.LOG_DIR.value + "/"
-        # Stop training if avg_reward > solved_reward
-        if (episode % LOG_INTERVAL) != 0 and running_reward / (episode % LOG_INTERVAL) > (SOLVED_REWARD):
-            print("########## Solved! ##########")
-            torch.save(agent.policy.state_dict(), './' + LOG_DIR + 'rl_solved_{}.pth'.format(ENV_NAME))
+        # Show Average Episode Reward and Timesteps
+        print("* Average Episode Reward: ", avg_episode_reward/avg_episode_timesteps)
+        print("* Episode Timesteps: ", avg_episode_timesteps)
+        episodes_avg_rewards.append(avg_episode_reward/avg_episode_timesteps)
+        episodes_length.append(avg_episode_timesteps)
+        avg_episode_reward = 0
+        avg_episode_timesteps = 0
+        # Update the average length of episodes
+        avg_length += t+1
+        #° Stop training if avg_reward > solved_reward
+        if (episode % log_interval) > 10 and running_reward / avg_length > solved_reward:
+            print("#"*20, "Solved", "#"*20)
+            print("Running reward: ", running_reward/avg_length)
+            torch.save(agent.policy.state_dict(), 
+                './' + log_dir + '{}_rl_solved.pth'.format(env_name))
             break
-        
-        # Save model every 500 episodes
-        if episode % 500 == 0:
-            torch.save(agent.policy.state_dict(), './' + LOG_DIR + 'rl_{}.pth'.format(ENV_NAME))
+        #° Save model 
+        if episode % save_model == 0:
+            print("*", "-"*19, "\tSaving Model  ", "-"*19)
+            torch.save(agent.policy.state_dict(),
+                './' + log_dir + '{}_rl.pth'.format(env_name))
             torch.save(agent.policy.actor.graph_encoder.state_dict(),
-                        './' + LOG_DIR +'rl_graph_encoder_actor_{}.pth'.format(ENV_NAME))
+                './' + log_dir + '{}_rl_graph_encoder_actor.pth'.format(env_name))
             torch.save(agent.policy.critic.graph_encoder_critic.state_dict(),
-                        './' + LOG_DIR +  'rl_graph_encoder_critic_{}.pth'.format(ENV_NAME))    
-        
-        # Log details
-        if episode % LOG_INTERVAL == 0:
-            avg_length = int(avg_length / LOG_INTERVAL)
-            running_reward = int((running_reward / LOG_INTERVAL))
-            
-            print("*"*50)
-            print('* Episode {} \t avg length: {} \t reward: {}'.format(episode, avg_length, running_reward))
-            print("*"*50)
+                './' + log_dir + '{}_rl_graph_encoder_critic.pth'.format(env_name))
+        #° Log details
+        if episode % log_interval == 0:
+            avg_length = int(avg_length / log_interval)
+            running_reward = int((running_reward / log_interval))
+            print("*", "-"*56)
+            print('* Episode {}\t avg log length: {}\t avg log reward: {:.2f}'.format(episode,avg_length, running_reward/avg_length))
+            print("*", "-"*56)
             running_reward = 0
-            avg_length = 0     
-        
+            avg_length = 0
+
         if env.debug:
             env.plot_graph()
-        
-        print("\n")
+        print("*"*57, "\n")
+    
+    hyperparams_dict = {
+        "max_episodes": max_episodes,
+        "max_timesteps": max_timesteps,
+        "update_timesteps": update_timesteps,
+        "log_interval": log_interval,
+        "solved_reward": solved_reward,
+        "save_model": save_model,
+        "state_dim": agent.state_dim,
+        "action_dim": agent.action_dim,
+        "action_std": agent.action_std,
+        "lr": agent.lr,
+        "gamma": agent.gamma,
+        "K_epochs": agent.K_epochs,
+        "eps_clip": agent.eps_clip,
+    }
+    # Save lists and hyperparameters in a json file
+    Utils.write_results_to_json(episodes_avg_rewards, episodes_length, hyperparams_dict, env_name)
+    
+    return episodes_avg_rewards, episodes_length

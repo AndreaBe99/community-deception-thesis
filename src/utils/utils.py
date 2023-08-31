@@ -137,38 +137,42 @@ class FilePaths(Enum):
     ORK = DATASETS_DIR + '/ork.mtx'
 
 class HyperParams(Enum):
-    """
-    Hyperparameters for the model.
-    """
-    WEIGHT = 0.8
+    """ Hyperparameters for the model."""
+    
+    """ Graph Encoder Parameters """""
     G_IN_SIZE = 50
-    HIDDEN1 = 300
-    HIDDEN2 = 300
     G_HIDDEN_SIZE = 50
     G_EMBEDDING_SIZE = 50
+    
+    """ Agent Parameters"""
     HIDDEN_SIZE = 300
     ACTION_STD = 0.5
     EPS_CLIP = 0.2
     LR = 0.0003
     GAMMA = 0.99
-    K_EPOCHS = 20
-    LOG_INTERVAL = 20
-    MAX_EPISODES = 200          # 15000
-    MAX_TIMESTEPS = 10
-    UPDATE_TIMESTEP = 100
-    SOLVED_REWARD = 0.7
     
+    """ Training Parameters """
+    # Number of episodes to collect experience
+    MAX_EPISODES = 200          # 15000
+    # Maximum number of time steps per episode
+    MAX_TIMESTEPS = 10 # ! Unused, I set it to the double of the edge budget
+    # Update the policy after N timesteps
+    UPDATE_TIMESTEP = 100 # ! Unused, I set it to 10 times the edge budget
+    # Update policy for K epochs
+    K_EPOCHS = 20
+    # Print info about the model after N episodes
+    LOG_INTERVAL = 20
+    # Exit if the average reward is greater than this value
+    SOLVED_REWARD = 0.7
     # Save model after N episodes
     SAVE_MODEL = int(MAX_EPISODES / 10)
-    
     # Use a random seed
     RANDOM_SEED = 42
-    
-    
     
     """Hyperparameters for the Environment"""
     BETA = 30 # Numeber of possible action with BETA=30, is 30% of the edges
     DEBUG = False
+    WEIGHT = 0.8
 
 class DetectionAlgorithms(Enum):
     """

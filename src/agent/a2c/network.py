@@ -19,16 +19,26 @@ class ActorCritic(nn.Module):
         super(ActorCritic, self).__init__()
         # action mean range -1 to 1
         actor_cfg = {
+            # Encoder
             'g_in_size': state_dim,
-            'g_hidden_size': HyperParams.G_HIDDEN_SIZE.value,
+            'g_hidden_size_1': HyperParams.G_HIDDEN_SIZE_1.value,
+            'g_hidden_size_2': HyperParams.G_HIDDEN_SIZE_2.value,
             'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
-            'hidden_size': HyperParams.HIDDEN_SIZE.value,
+            
+            # Actor
+            'hidden_size_1': HyperParams.HIDDEN_SIZE_1.value,
+            'hidden_size_2': HyperParams.HIDDEN_SIZE_2.value,
             'nb_actions': action_dim,
         }
         critic_cfg = {
+            # Encoder
             'g_in_size': state_dim,
-            'g_hidden_size': HyperParams.G_HIDDEN_SIZE.value,
+            'g_hidden_size_1': HyperParams.G_HIDDEN_SIZE_1.value,
+            'g_hidden_size_2': HyperParams.G_HIDDEN_SIZE_2.value,
             'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
+
+            # Critic
+            'hidden_size_1': HyperParams.HIDDEN_SIZE_1.value,
         }
         self.actor = ActorNetwork(**actor_cfg)
         self.critic = CriticNetwork(**critic_cfg)

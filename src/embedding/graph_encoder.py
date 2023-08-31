@@ -8,37 +8,49 @@ import torch.nn.functional as F
 
 
 class GraphEncoder(nn.Module):
-    def __init__(self,in_feature, hidden_feature, out_feature):
+    def __init__(
+        self,
+        in_feature, 
+        hidden_feature_1,
+        hidden_feature_2,
+        out_feature):
         super(GraphEncoder, self).__init__()
         self.in_feature = in_feature
-        self.hidden_feature = hidden_feature
+        self.hidden_feature_1 = hidden_feature_1
+        self.hidden_feature_2 = hidden_feature_2
         self.out_feature = out_feature
         
         #Torch Geometric GCNConv
-        self.pyg_conv = GCNConv(in_feature, hidden_feature)
-        self.linear1 = nn.Linear(hidden_feature,out_feature)
+        self.pyg_conv1 = GCNConv(in_feature, hidden_feature_1)
+        self.pyg_conv2 = GCNConv(hidden_feature_1, hidden_feature_2)
+        
+        self.linear1 = nn.Linear(hidden_feature_2, out_feature)
         self.tanh = nn.Tanh()
         self.relu = torch.relu
         
         # TEST Use GATConv
-        self.in_head = self.hidden_feature
-        self.conv1 = GATConv(
-            self.in_feature, 
-            self.hidden_feature, 
-            heads=self.in_head, 
-            dropout=0.6)
-        self.conv2 = GATConv(
-            self.hidden_feature * self.in_head, 
-            self.out_feature, 
-            concat=False,
-            heads=self.out_feature,
-            dropout=0.6)
+        # self.in_head = self.hidden_feature
+        # self.conv1 = GATConv(
+        #     self.in_feature, 
+        #     self.hidden_feature, 
+        #     heads=self.in_head, 
+        #     dropout=0.6)
+        # self.conv2 = GATConv(
+        #     self.hidden_feature * self.in_head, 
+        #     self.out_feature, 
+        #     concat=False,
+        #     heads=self.out_feature,
+        #     dropout=0.6)
     
     #NOTE Torch Geometric MessagePassing, it takes as input the edge list 
     def forward(self, graph: Data)-> torch.Tensor:
         x, edge_index, batch = graph.x, graph.edge_index, graph.batch
-        x = self.pyg_conv(x, edge_index)
+        x = self.pyg_conv1(x, edge_index)
         x = self.relu(x)
+        
+        x = self.pyg_conv2(x, edge_index)
+        x = self.relu(x)
+        
         embedding = global_mean_pool(x, batch)
         embedding = self.linear1(embedding)
         embedding = self.tanh(embedding)

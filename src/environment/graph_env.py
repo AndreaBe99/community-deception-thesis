@@ -5,6 +5,7 @@ from src.community_algs.detection_algs import DetectionAlgorithm
 from src.utils.utils import DetectionAlgorithms
 from src.utils.utils import HyperParams
 from torch_geometric.utils import from_networkx
+from torch_geometric.transforms import RemoveDuplicatedEdges
 from torch_geometric.data import Data
 from typing import List, Tuple
 # from torch_geometric.data import DataLoader
@@ -13,8 +14,7 @@ import math
 import numpy as np
 import networkx as nx
 import torch
-# import sys 
-# sys.path.append('../../')
+
 
 class GraphEnvironment(object):
     """Enviroment where the agent will act, it will be a graph with a community"""
@@ -32,44 +32,54 @@ class GraphEnvironment(object):
         assert beta >= 0 and beta <= 100, "Beta must be between 0 and 100"
         self.beta = beta
         self.debug = debug
+        self.training = None
         self.eps = 1e-8
-        self.rewards_scale_multiplier = 10 # 0, 10, 100
         
-        self.nmi = NormalizedMutualInformation()
-        # Setup later, with the setup function
+        # List of possible actions, N+M, where N is ADD actions and M is REMOVE actions
+        self.possible_actions = None
+        # Length of the list of possible actions to add, used to distinguish
+        # between ADD and REMOVE actions in the list of possible actions
+        # when applying the action
+        self.len_add_actions = 0
+        
+        # Graph State
         self.graph = None
         self.graph_copy = None
-        
-        # TEST Use a variable to store the Data graph object
         self.data_pyg = None
+        self.n_connected_components = None
         
+        # Community Algorithms
         self.deception = None
         self.detection = None
+        self.nmi = NormalizedMutualInformation()
         # Community to hide
         self.community_target = None
         # Community Structure before the action
         self.community_structure_old = None
         # Community Structure after the action
         self.community_structure_new = None
-        self.n_connected_components = None
-        self.training = None
+        
+        # Reward
         self.rewards = None
-        
-        #TEST
         self.old_rewards = 0
-        
+
+        # Edge budget, i.e. the number of edges to rewire/update
         self.edge_budget = None
         self.used_edge_budget = None
         self.exhausted_budget = None
-        
-        # Possible actions
-        self.possible_actions = None
     
     @staticmethod
     def get_possible_actions(
         graph: nx.Graph, 
         community: List[int])->List[Tuple[int, int]]:
-        """Returns the possible actions that can be applied to the graph
+        """Returns the possible actions that can be applied to the graph.
+        An action is a tuple of two nodes, where the first node is the source
+        node and the second node is the destination node. 
+        The action can be:
+            - add an edge between the two nodes, iff one belongs to the 
+                community and the other does not.
+            - remove an edge between the two nodes, iff both belong to the
+                community.
 
         Parameters
         ----------
@@ -152,131 +162,13 @@ class GraphEnvironment(object):
         reward = weight * deception_score + (1 - weight) * nmi_score
         return reward
     
-    def plot_graph(self) -> None:
-        """Plot the graph using matplotlib"""
-        import matplotlib.pyplot as plt
-        nx.draw(self.graph, with_labels=True)
-        plt.show()
-        
-
-    #TODO This function is not used anymore, since we use DGL instead of PyG
-    def delete_repeat_edges(self, data: Data) -> torch.Tensor:
-        """The Data object contains the edge_index tensor, which is a tensor
-        of size 2*N, where N is the number of edges. The first row of the tensor
-        contains the indices of the source nodes, and the second row contains
-        the indices of the destination nodes. Each row of the tensor represents
-        an edge in the graph. This function removes the duplicate edges, i.e.
-        the edges that are present in both directions, e.g. (0, 1) and (1, 0)
-
-        Parameters
-        ----------
-        data : Data
-            Graph before the duplicate edges have been removed
-
-        Returns
-        -------
-        data : Data
-            Graph after the duplicate edges have been removed
-        """
-        #TODO Remove duplicate edges, without reshaping the tensor
-        # Reshape the edge_index tensor in N*2
-        edge_index = data.edge_index.t().contiguous()
-        # Remove the duplicate edges
-        sorted_edge_index, _ = torch.sort(edge_index, dim=1)
-        edge_index = torch.unique(sorted_edge_index, dim=0)
-        data.edge_index = edge_index.t().contiguous()
-        return data
-    
-    def reset(self) -> Data:
-        """Reset the environment
-
-        Returns
-        -------
-        adj_matrix : torch.Tensor
-            Adjacency matrix of the graph
-        """
-        self.used_edge_budget = 0
-        self.exhausted_budget = False
-        self.graph = self.graph_copy.copy()
-        self.possible_actions = self.get_possible_actions(
-            self.graph, self.community_target)
-        # self.rewards = 0.0
-        
-        # Return a PyG Data object
-        data = self.delete_repeat_edges(from_networkx(self.graph))
-        data.x = torch.randn([data.num_nodes, 50])
-        data.batch = torch.zeros(data.num_nodes).long()
-        self.data_pyg = data
-        return data
-    
-    def apply_action(self, actions: np.array)->int:
-        """Applies the action to the graph, if there is an edge between the two 
-        nodes, it removes it, otherwise it adds it
-
-        Parameters
-        ----------
-        actions : np.array
-            List of possible actions, where each element is a real number
-            between 0 and 1
-        
-        Returns
-        -------
-        budget_consumed : int
-            Amount of budget consumed
-        """
-        # Check if between the two nodes there is an edge:
-        #   - If there is an edge, it means that the action is to remove it
-        #   - If there is no edge, it means that the action is to add it 
-
-        # Get the index of the maximum value in the action list
-        index = np.argmax(actions)
-        #° The number of possible actions is: 
-        #°      len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"])
-        #° So, if the index is less than the number of possible actions to add,
-        #° the action to apply is an action to add, otherwise it is an action to remove
-        # Get the action to apply from self.possible_actions
-        if index < len(self.possible_actions["ADD"]):
-            action = self.possible_actions["ADD"][index]
-        else:
-            action = self.possible_actions["REMOVE"][index - len(self.possible_actions["ADD"])]
-        
-        #TODO Join th following code with the code above
-        if action == (-1,-1):
-            budget_consumed = 0
-        # Check if the action is to add or to remove an edge
-        elif action in self.possible_actions["REMOVE"]:
-            self.graph.remove_edge(*action)
-            # Replace the removed edge with (-1,-1) in the possible actions, 
-            # in order to keep the same length, and to avoid to remove the same
-            # edge multiple times
-            idx = self.possible_actions["REMOVE"].index(action)
-            self.possible_actions["REMOVE"][idx] = (-1,-1)
-            budget_consumed = 1
-            
-            if self.debug:
-                print("Removed edge:", action)
-        
-        elif action in self.possible_actions["ADD"]:
-            self.graph.add_edge(*action, weight=1)
-            # Replace the added edge with (-1,-1) in the possible actions, in this way
-            # we can keep track of the used actions, and we can avoid to add the same
-            # edge multiple times
-            idx = self.possible_actions["ADD"].index(action)
-            self.possible_actions["ADD"][idx] = (-1,-1)
-            budget_consumed = 1
-            
-            if self.debug:
-                print("Added edge:", action)
-        else:
-            budget_consumed = 0
-        return budget_consumed
     
     def setup(
         self,
         graph: nx.Graph,
         community: List[int],
-        community_detection_algorithm: str=DetectionAlgorithms.LOUV.value,
-        training: bool=False) -> None:
+        community_detection_algorithm: str = DetectionAlgorithms.LOUV.value,
+        training: bool = False) -> None:
         """Setup function for the environment
 
         Parameters
@@ -295,30 +187,105 @@ class GraphEnvironment(object):
         self.community_target = community
         self.training = training
         self.rewards = 0.0
-        
+
         # Get the Number of connected components
-        self.n_connected_components = nx.number_connected_components(self.graph)
-        
+        self.n_connected_components = nx.number_connected_components(
+            self.graph)
+
         self.detection = DetectionAlgorithm(community_detection_algorithm)
         self.deception = DeceptionScore(self.community_target)
-        
-        # Compute the community structure of the graph, before the action, 
+
+        # Compute the community structure of the graph, before the action,
         # i.e. before the deception
         self.community_structure_old = self.detection.compute_community(
             self.graph)
-        
+
         # Compute the edge budget for the graph
         self.edge_budget = self.get_edge_budget(self.graph, self.beta)
         self.used_edge_budget = 0
         self.exhausted_budget = False
-        
+
         # Compute the set of possible actions
         self.possible_actions = self.get_possible_actions(
             self.graph, self.community_target)
+        # Length of the list of possible actions to add
+        self.len_add_actions = len(self.possible_actions["ADD"])
+
+    
+    def reset(self) -> Data:
+        """Reset the environment
+
+        Returns
+        -------
+        adj_matrix : torch.Tensor
+            Adjacency matrix of the graph
+        """
+        self.used_edge_budget = 0
+        self.exhausted_budget = False
+        self.graph = self.graph_copy.copy()
+        self.possible_actions = self.get_possible_actions(self.graph, self.community_target)
         
+        # Return a PyG Data object
+        self.data_pyg = from_networkx(self.graph)
+        # self.data_pyg = self.remove_duplicated_edges(self.data_pyg)
+        # print("Edges:", self.data_pyg.edge_index.shape)
+        # self.data_pyg = self.delete_repeat_edges(from_networkx(self.graph))
+        
+        # Initialize the node features
+        self.data_pyg.x = torch.randn([self.data_pyg.num_nodes, HyperParams.G_IN_SIZE.value])
+        # Initialize the batch
+        self.data_pyg.batch = torch.zeros(self.data_pyg.num_nodes).long()
+        return self.data_pyg
+    
+    def apply_action(self, actions: np.array)->int:
+        """Applies the action to the graph, if there is an edge between the two 
+        nodes, it removes it, otherwise it adds it
+
+        Parameters
+        ----------
+        actions : np.array
+            List of possible actions, where each element is a real number
+            between 0 and 1
+        
+        Returns
+        -------
+        budget_consumed : int
+            Amount of budget consumed
+        """
+        # Get the index of the action to apply
+        index = np.argmax(actions)
+        #° The number of possible actions is: 
+        #°      len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"])
+        #° So, if the index is less than the number of possible actions to add,
+        #° the action to apply is an action to add, otherwise it is an action to remove
+        if index < self.len_add_actions:
+            action = self.possible_actions["ADD"][index]
+            # If the action is (-1,-1) it means that the action has already been
+            # applied, so we do not need to apply it again
+            if action == (-1,-1): return 0
+            # Apply the action
+            self.graph.add_edge(*action, weight=1)
+            # Replace the added edge with (-1,-1) in the possible actions, in this way
+            # we can keep track of the used actions, and we can avoid to add the same
+            # edge multiple times
+            self.possible_actions["ADD"][index] = (-1, -1)
+            return 1
+        else:
+            action = self.possible_actions["REMOVE"][index - self.len_add_actions]
+            # If the action is (-1,-1) it means that the action has already been
+            # applied, so we do not need to apply it again
+            if action == (-1, -1): return 0
+            # Apply the action
+            self.graph.remove_edge(*action)
+            # Replace the removed edge with (-1,-1) in the possible actions,
+            # in order to keep the same length, and to avoid to remove the same
+            # edge multiple times
+            self.possible_actions["REMOVE"][index - self.len_add_actions] = (-1, -1)
+            return 1
+    
     def step(self, actions: np.array) -> Tuple[Data, float]:
         """Step function for the environment
-
+        
         Parameters
         ----------
         actions : np.array
@@ -330,8 +297,6 @@ class GraphEnvironment(object):
         self.graph, self.rewards: Tuple[torch.Tensor, float]
             Tuple containing the new graph and the reward 
         """
-        
-                
         # Compute the remaining budget
         remaining_budget = self.edge_budget - self.used_edge_budget
         
@@ -373,10 +338,17 @@ class GraphEnvironment(object):
         
         # Update the used edge budget
         self.used_edge_budget += (remaining_budget - updated_budget)
-        
+
         # Return a PyG Data object
-        data = self.delete_repeat_edges(from_networkx(self.graph))
+        data = from_networkx(self.graph)
+        # Assign the node features and the batch of the old graph to the new graph
         data.x = self.data_pyg.x
         data.batch = self.data_pyg.batch
         self.data_pyg = data
-        return data, self.rewards
+        return self.data_pyg, self.rewards
+    
+    def plot_graph(self) -> None:
+        """Plot the graph using matplotlib"""
+        import matplotlib.pyplot as plt
+        nx.draw(self.graph, with_labels=True)
+        plt.show()

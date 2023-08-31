@@ -25,7 +25,9 @@ class ActorNetwork(nn.Module):
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_rl')
         self.graph_encoder = GraphEncoder(
-            g_in_size, g_hidden_size, g_embedding_size)
+            in_feature=g_in_size, 
+            hidden_feature=g_hidden_size, 
+            out_feature=g_embedding_size)
         self.linear1 = nn.Linear(g_embedding_size, hidden_size)
         self.linear2 = nn.Linear(hidden_size, nb_actions)
         self.nb_actions = nb_actions

@@ -5,7 +5,6 @@ from src.community_algs.detection_algs import DetectionAlgorithm
 from src.utils.utils import DetectionAlgorithms
 from src.utils.utils import HyperParams
 from torch_geometric.utils import from_networkx
-from torch_geometric.transforms import RemoveDuplicatedEdges
 from torch_geometric.data import Data
 from typing import List, Tuple
 # from torch_geometric.data import DataLoader
@@ -34,6 +33,9 @@ class GraphEnvironment(object):
         self.debug = debug
         self.training = None
         self.eps = 1e-8
+        
+        self.device = torch.device(
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
         
         # List of possible actions, N+M, where N is ADD actions and M is REMOVE actions
         self.possible_actions = None
@@ -235,7 +237,7 @@ class GraphEnvironment(object):
         self.data_pyg.x = torch.randn([self.data_pyg.num_nodes, HyperParams.G_IN_SIZE.value])
         # Initialize the batch
         self.data_pyg.batch = torch.zeros(self.data_pyg.num_nodes).long()
-        return self.data_pyg
+        return self.data_pyg.to(self.device)
     
     def apply_action(self, actions: np.array)->int:
         """Applies the action to the graph, if there is an edge between the two 
@@ -345,7 +347,7 @@ class GraphEnvironment(object):
         data.x = self.data_pyg.x
         data.batch = self.data_pyg.batch
         self.data_pyg = data
-        return self.data_pyg, self.rewards
+        return self.data_pyg.to(self.device), self.rewards
     
     def plot_graph(self) -> None:
         """Plot the graph using matplotlib"""

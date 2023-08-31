@@ -54,12 +54,13 @@ class Agent:
         """
         #  # state = torch.FloatTensor(state.reshape(1, -1)).to(device)
         # ! OLD
-        return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
+        # return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
         
         # ! NEW
-        # with torch.no_grad():
-        #    # state = torch.FloatTensor(state).to(device)
-        #    action, action_logprob = self.policy_old.act(state, memory)
+        with torch.no_grad():
+            # state = torch.FloatTensor(state).to(device)
+            action = self.policy_old.act(state, memory)
+        return action.cpu().data.numpy().flatten()
         #return action.tolist()
             
     def update(self, memory: Memory):

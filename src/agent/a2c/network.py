@@ -2,6 +2,7 @@
 from src.agent.a2c.actor import ActorNetwork
 from src.agent.a2c.critic import CriticNetwork
 from src.agent.a2c.memory import Memory
+from src.utils.utils import HyperParams
 
 from torch.distributions import MultivariateNormal
 from torch_geometric.data import Data
@@ -19,16 +20,15 @@ class ActorCritic(nn.Module):
         # action mean range -1 to 1
         actor_cfg = {
             'g_in_size': state_dim,
-            'g_hidden_size': 50,
-            'g_embedding_size': 50,
-            'hidden_size': 200,
+            'g_hidden_size': HyperParams.G_HIDDEN_SIZE.value,
+            'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
+            'hidden_size': HyperParams.HIDDEN_SIZE.value,
             'nb_actions': action_dim,
-
         }
         critic_cfg = {
             'g_in_size': state_dim,
-            'g_hidden_size': 50,
-            'g_embedding_size': 50,
+            'g_hidden_size': HyperParams.G_HIDDEN_SIZE.value,
+            'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
         }
         self.actor = ActorNetwork(**actor_cfg)
         self.critic = CriticNetwork(**critic_cfg)
@@ -63,7 +63,6 @@ class ActorCritic(nn.Module):
         action_mean = self.actor(state)
         
         cov_mat = torch.diag(self.action_var).to(self.device)
-
         dist = MultivariateNormal(action_mean, cov_mat)
         action = dist.sample()
         action_logprob = dist.log_prob(action)
@@ -102,5 +101,4 @@ class ActorCritic(nn.Module):
         dist_entropy = dist.entropy()
         state_value = self.critic(state)
 
-        # return action_logprobs, torch.squeeze(state_value), dist_entropy
         return action_logprobs, state_value, dist_entropy

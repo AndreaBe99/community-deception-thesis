@@ -43,12 +43,14 @@ class HyperParams(Enum):
     """ Hyperparameters for the model."""
 
     """ Graph Encoder Parameters """""
-    G_IN_SIZE = 50
-    G_HIDDEN_SIZE = 50
-    G_EMBEDDING_SIZE = 50
+    G_IN_SIZE = 64
+    G_HIDDEN_SIZE_1 = 128
+    G_HIDDEN_SIZE_2 = 64
+    G_EMBEDDING_SIZE = 32
 
     """ Agent Parameters"""
-    HIDDEN_SIZE = 300
+    HIDDEN_SIZE_1 = 64
+    HIDDEN_SIZE_2 = 128
     ACTION_STD = 0.5
     EPS_CLIP = 0.2
     LR = 0.0003
@@ -131,50 +133,65 @@ class Utils:
 
     @staticmethod
     def plot_avg_reward(
-            reward: List[float],
-            episode_length: List[int],
+            log_reward: List[float],
+            log_timesteps: List[int],
+            log_loss: List[float],
             env_name: str,
             file_path: str = FilePaths.LOG_DIR.value):
         """
         Plot the average reward and the time steps of the episodes in the same
         plot, using matplotlib, where the average reward is the blue line and
-        the episode length are the orange line.
+        the episode length are the orange line, and the loss in a different
+        image.
 
         Parameters
         ----------
-        reward : List[float]
+        log_reward : List[float]
             Average reward for each episode
-        episode_length : List[int]
+        log_timesteps : List[int]
             Time steps for each episode
+        log_loss : List[float]
+            Loss for each episode
         env_name : str
             Environment name
         file_path : str, optional
             Path to save the plot, by default "src/logs/"
         """
-        fig, ax1 = plt.subplots()
+        _, ax1 = plt.subplots()
 
         color = 'tab:blue'
         ax1.set_xlabel('Episode')
         ax1.set_ylabel('Average Reward', color=color)
-        ax1.plot(reward, color=color)
+        ax1.plot(log_reward, color=color)
         ax1.tick_params(axis='y', labelcolor=color)
 
         ax2 = ax1.twinx()
         color = 'tab:orange'
         ax2.set_ylabel('Time Steps', color=color)
-        ax2.plot(episode_length, color=color)
+        ax2.plot(log_timesteps, color=color)
         ax2.tick_params(axis='y', labelcolor=color)
 
-        fig.tight_layout()
-        plt.title(f'Average Reward and Time Steps per Episode ({env_name})')
-        file_name = f"{file_path}{env_name}_avg_reward.png"
-        plt.savefig(file_name, dpi=300, bbox_inches='tight')
+        plt.title(f"Training {env_name}")
+        plt.savefig(f"{file_path}{env_name}_training_reward.png")
+        plt.show()
+
+        _, ax1 = plt.subplots()
+        multiplier = int(HyperParams.UPDATE_TIMESTEP.value/HyperParams.MAX_TIMESTEPS.value)
+        color = 'tab:green'
+        ax1.set_xlabel('Epoch')
+        ax1.set_ylabel('Loss', color=color)
+        ax1.plot([int(i * multiplier) for i in range(len(log_loss))], log_loss, color=color)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        plt.title(f"Training {env_name}")
+        plt.savefig(f"{file_path}{env_name}_training_loss.png")
         plt.show()
 
     @staticmethod
     def write_results_to_json(
-            episodes_avg_reward: List[float],
-            episode_length: List[int],
+            log_reward: List[float],
+            log_length: List[int],
+            log_loss: List[float],
             hyperparameters: dict,
             env_name: str,
             file_path: str = FilePaths.LOG_DIR.value):
@@ -183,18 +200,21 @@ class Utils:
 
         Parameters
         ----------
-        episodes_avg_reward : List[float]
+        log_reward : List[float]
             List of average rewards for each episode
-        episode_length : List[int]
+        log_length : List[int]
             List of episode lengths
+        log_loss : List[float]
+            List of losses for each episode
         hyperparameters : dict
             Dictionary of hyperparameters used in the training process
-                file_path : str
+        file_path : str
             Path to the output JSON file
         """
         data = {
-            "episodes_avg_reward": episodes_avg_reward,
-            "episode_length": episode_length,
+            "episodes_avg_reward": log_reward,
+            "episode_avg_length": log_length,
+            "episode_avg_loss": log_loss,
             "hyperparameters": hyperparameters
         }
         file_name = f"{file_path}{env_name}_results.json"

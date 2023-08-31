@@ -7,9 +7,6 @@ from torch import nn
 import torch
 import os
 
-# import sys
-# sys.path.append('../../')
-
 class ActorNetwork(nn.Module):
     """Actor Network"""
     

@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import networkx as nx
-import scipy.sparse as sp
 
 class GraphEncoder(nn.Module):
     def __init__(self,in_feature, hidden_feature, out_feature):
@@ -61,6 +59,3 @@ class GraphEncoder(nn.Module):
     #     embedding = self.linear1(embedding)
     #     embedding = self.tanh(embedding)
     #     return embedding
-    
-        #return F.log_softmax(x, dim=1)
-        # return torch.flatten(x).T

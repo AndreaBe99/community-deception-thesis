@@ -102,4 +102,5 @@ if __name__ == "__main__":
         memory=memory, 
         max_timesteps=max_timesteps,
         update_timesteps=update_timesteps, 
-        env_name=env_name)
+        env_name=env_name,
+        detection_alg=detection_alg)

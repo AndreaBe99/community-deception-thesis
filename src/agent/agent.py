@@ -158,7 +158,8 @@ class Agent:
         solved_reward: float = HyperParams.SOLVED_REWARD.value,
         save_model: int = HyperParams.SAVE_MODEL.value,
         log_dir: str = FilePaths.LOG_DIR.value,
-        env_name: str = "Default") -> None:
+        env_name: str = "Default",
+        detection_alg: str = "Default") -> None:
         """
         Function to train the agent
 
@@ -180,6 +181,8 @@ class Agent:
             Directory for logging, by default FilePaths.LOG_DIR.value
         env_name : str, optional
             Environment name, by default "Default"
+        detection_alg : str, optional
+            Detection algorithm name, by default "Default"
         """
         # Logging Variables
         running_reward = 0
@@ -189,8 +192,10 @@ class Agent:
         log_reward = []
         log_timesteps = []
 
-        # ! Comment this line if you are on Kaggle or Colab
-        log_dir = './' + log_dir
+        # Set the log directory for the specific algorithm and dataset
+        log_dir = log_dir + env_name + '/' + detection_alg + '/'
+        # Check if the directory exists, otherwise create it
+        Utils.check_dir(log_dir)
 
         # Training loop
         for episode in range(1, max_episodes + 1):
@@ -240,17 +245,17 @@ class Agent:
                 print("#"*20, "Solved", "#"*20)
                 print("Running reward: ", running_reward/avg_length)
                 torch.save(self.policy.state_dict(),
-                        log_dir + '{}_rl_solved.pth'.format(env_name))
+                    log_dir + '{}_{}_rl_solved.pth'.format(env_name, detection_alg))
                 break
             # ° Save model
             if episode % save_model == 0:
                 print("*", "-"*19, "\tSaving Model  ", "-"*19)
                 torch.save(self.policy.state_dict(),
-                        log_dir + '{}_rl.pth'.format(env_name))
+                    log_dir + '{}_{}_rl.pth'.format(env_name, detection_alg))
                 torch.save(self.policy.actor.graph_encoder.state_dict(),
-                        log_dir + '{}_rl_graph_encoder_actor.pth'.format(env_name))
+                    log_dir + '{}_{}_rl_graph_encoder_actor.pth'.format(env_name, detection_alg))
                 torch.save(self.policy.critic.graph_encoder_critic.state_dict(),
-                        log_dir + '{}_rl_graph_encoder_critic.pth'.format(env_name))
+                    log_dir + '{}_{}_rl_graph_encoder_critic.pth'.format(env_name, detection_alg))
             # ° Log details
             if episode % log_interval == 0:
                 avg_length = int(avg_length / log_interval)
@@ -281,11 +286,24 @@ class Agent:
             "K_epochs": self.K_epochs,
             "eps_clip": self.eps_clip,
         }
+        
         # Save lists and hyperparameters in a json file
         print("*", "-"*18, " Saving results ", "-"*18)
         Utils.write_results_to_json(
-            log_reward, log_timesteps, self.log_loss, hyperparams_dict, env_name)
+            log_reward=log_reward,
+            log_length=log_timesteps,
+            log_loss=self.log_loss,
+            hyperparameters=hyperparams_dict,
+            env_name=env_name,
+            detection_algorithm=detection_alg, 
+            file_path=log_dir)
         
-        print("*", "-"*18, "Plotting results", "-"*18)
         # Plot the average reward per episode
-        Utils.plot_avg_reward(log_reward, log_timesteps, self.log_loss, env_name)
+        print("*", "-"*18, "Plotting results", "-"*18)
+        Utils.plot_avg_reward(
+            log_reward=log_reward, 
+            log_timesteps=log_timesteps, 
+            log_loss=self.log_loss, 
+            env_name=env_name, 
+            detection_algorithm=detection_alg,
+            file_path=log_dir)

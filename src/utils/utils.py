@@ -130,13 +130,26 @@ class Utils:
         except Exception as exception:
             print("Error: ", exception)
             return None
+    @staticmethod
+    def check_dir(path: str):
+        """
+        Check if the directory exists, if not create it.
 
+        Parameters
+        ----------
+        path : str
+            Path to the directory
+        """
+        if not os.path.exists(path):
+            os.makedirs(path)
+    
     @staticmethod
     def plot_avg_reward(
             log_reward: List[float],
             log_timesteps: List[int],
             log_loss: List[float],
             env_name: str,
+            detection_algorithm: str,
             file_path: str = FilePaths.LOG_DIR.value):
         """
         Plot the average reward and the time steps of the episodes in the same
@@ -154,6 +167,8 @@ class Utils:
             Loss for each episode
         env_name : str
             Environment name
+        detection_algorithm : str
+            Detection algorithm used
         file_path : str, optional
             Path to save the plot, by default "src/logs/"
         """
@@ -172,7 +187,8 @@ class Utils:
         ax2.tick_params(axis='y', labelcolor=color)
 
         plt.title(f"Training {env_name}")
-        plt.savefig(f"{file_path}{env_name}_training_reward.png")
+        plt.savefig(
+            f"{file_path}{env_name}_{detection_algorithm}_training_reward.png")
         plt.show()
 
         _, ax1 = plt.subplots()
@@ -184,7 +200,8 @@ class Utils:
         ax1.tick_params(axis='y', labelcolor=color)
 
         plt.title(f"Training {env_name}")
-        plt.savefig(f"{file_path}{env_name}_training_loss.png")
+        plt.savefig(
+            f"{file_path}{env_name}_{detection_algorithm}_training_loss.png")
         plt.show()
 
     @staticmethod
@@ -194,6 +211,7 @@ class Utils:
             log_loss: List[float],
             hyperparameters: dict,
             env_name: str,
+            detection_algorithm: str,
             file_path: str = FilePaths.LOG_DIR.value):
         """
         Write the episodes_avg_reward, episode_length, and hyperparameters to a JSON file.
@@ -208,6 +226,10 @@ class Utils:
             List of losses for each episode
         hyperparameters : dict
             Dictionary of hyperparameters used in the training process
+        env_name : str
+            Environment name
+        detection_algorithm : str
+            Detection algorithm used
         file_path : str
             Path to the output JSON file
         """
@@ -217,6 +239,6 @@ class Utils:
             "episode_avg_loss": log_loss,
             "hyperparameters": hyperparameters
         }
-        file_name = f"{file_path}{env_name}_results.json"
+        file_name = f"{file_path}{env_name}_{detection_algorithm}_results.json"
         with open(file_name, "w") as f:
             json.dump(data, f, indent=4)

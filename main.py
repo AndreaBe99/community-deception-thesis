@@ -3,7 +3,6 @@ from src.community_algs.detection_algs import DetectionAlgorithm
 from src.environment.graph_env import GraphEnvironment
 from src.agent.a2c.memory import Memory
 from src.agent.agent import Agent
-from src.train import train
 import os
 os.environ['DGLBACKEND'] = 'pytorch'
 

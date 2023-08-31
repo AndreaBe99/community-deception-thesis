@@ -302,11 +302,8 @@ class GraphEnvironment(object):
         # Compute the remaining budget
         remaining_budget = self.edge_budget - self.used_edge_budget
         
-        if remaining_budget <= 0:
-            self.exhausted_budget = True
-            return self.graph, self.rewards
-        
-        # Take action
+        # Take action, budget_consumed can be 0 or 1, i.e. if the action has
+        # been applied or not
         budget_consumed = self.apply_action(actions)
         # Decrease the remaining budget
         updated_budget = remaining_budget - budget_consumed
@@ -327,7 +324,6 @@ class GraphEnvironment(object):
             print("Community Structure Old:", self.community_structure_new)
             print("Deception Score:", deception_score)
             print("NMI Score:", nmi)
-
         
         # Compute the reward, using the deception score and the NMI score
         reward = self.get_reward(deception_score, nmi)
@@ -340,6 +336,11 @@ class GraphEnvironment(object):
         
         # Update the used edge budget
         self.used_edge_budget += (remaining_budget - updated_budget)
+        
+        # If the budget for the graph rewiring is exhausted, stop the episode
+        if remaining_budget < 1:
+            print("*", "-" * 19, "Budget exhausted", "-" * 19)
+            self.exhausted_budget = True
 
         # Return a PyG Data object
         data = from_networkx(self.graph)
@@ -347,7 +348,7 @@ class GraphEnvironment(object):
         data.x = self.data_pyg.x
         data.batch = self.data_pyg.batch
         self.data_pyg = data
-        return self.data_pyg.to(self.device), self.rewards
+        return self.data_pyg.to(self.device), self.rewards, self.exhausted_budget
     
     def plot_graph(self) -> None:
         """Plot the graph using matplotlib"""

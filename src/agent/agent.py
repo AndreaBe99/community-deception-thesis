@@ -21,6 +21,7 @@ class Agent:
         self.gamma = gamma
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
+        self.log_loss = []
         
         self.memory = Memory()
 
@@ -98,6 +99,7 @@ class Agent:
         old_actions = torch.squeeze(torch.stack(memory.actions, dim=1)).detach().to(self.device)
         old_logprobs = torch.squeeze(torch.stack(memory.logprobs, dim=1)).detach().to(self.device)
         
+        losses = []
         # Optimize policy for K epochs
         for i in range(self.K_epochs):
             
@@ -132,12 +134,14 @@ class Agent:
             
             if (i+1) % 5 == 0 or i == 0:
                 print('* Epoches {} \t loss: {} \t '.format(i+1, loss.mean()))
-            
+                losses.append(loss.mean().item())
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
             self.optimizer.step()
         
+        # Comute mean loss over the K epochs
+        self.log_loss.append(sum(losses)/len(losses))
         # Copy new weights into old policy:
         self.policy_old.load_state_dict(self.policy.state_dict())
         # Clear memory
@@ -182,8 +186,8 @@ class Agent:
         avg_length = 0
         time_step = 0
 
-        episodes_avg_rewards = []
-        episodes_length = []
+        log_reward = []
+        log_timesteps = []
 
         # ! Comment this line if you are on Kaggle or Colab
         log_dir = './' + log_dir
@@ -198,15 +202,11 @@ class Agent:
             avg_episode_reward = 0
             avg_episode_timesteps = 0
             for t in range(max_timesteps):
-                # If the budget for the graph rewiring is exhausted, stop the episode
-                if env.used_edge_budget == env.edge_budget - 1:
-                    print("*", "-" * 19, "Budget exhausted", "-" * 19)
-                    done = True
                 time_step += 1
                 # ° Running policy_old, return a distribution over the actions
                 actions = self.select_action(state, memory)
                 # ° Perform the step on the environment, i.e. add or remove an edge
-                state, reward = env.step(actions)
+                state, reward, done = env.step(actions)
                 # ° Saving reward and is_terminals
                 memory.rewards.append(reward)
                 memory.is_terminals.append(done)
@@ -229,8 +229,8 @@ class Agent:
             print("* Average Episode Reward: ",
                 avg_episode_reward/avg_episode_timesteps)
             print("* Episode Timesteps: ", avg_episode_timesteps)
-            episodes_avg_rewards.append(avg_episode_reward/avg_episode_timesteps)
-            episodes_length.append(avg_episode_timesteps)
+            log_reward.append(avg_episode_reward/avg_episode_timesteps)
+            log_timesteps.append(avg_episode_timesteps)
             avg_episode_reward = 0
             avg_episode_timesteps = 0
             # Update the average length of episodes
@@ -282,10 +282,10 @@ class Agent:
             "eps_clip": self.eps_clip,
         }
         # Save lists and hyperparameters in a json file
-        print("*", "-"*18, "Saving results", "-"*18)
+        print("*", "-"*18, " Saving results ", "-"*18)
         Utils.write_results_to_json(
-            episodes_avg_rewards, episodes_length, hyperparams_dict, env_name)
+            log_reward, log_timesteps, self.log_loss, hyperparams_dict, env_name)
         
         print("*", "-"*18, "Plotting results", "-"*18)
         # Plot the average reward per episode
-        Utils.plot_avg_reward(episodes_avg_rewards, episodes_length, env_name)
+        Utils.plot_avg_reward(log_reward, log_timesteps, self.log_loss, env_name)

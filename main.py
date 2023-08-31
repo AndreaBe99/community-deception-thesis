@@ -22,19 +22,18 @@ if __name__ == "__main__":
     print("*", graph)
 
     # ° --- Environment Setup --- ° #
-    # Define beta, i.e. the percentage of edges to add/remove
-    beta = HyperParams.BETA.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
     detection_alg = DetectionAlgorithms.WALK.value
     # Apply the community detection algorithm on the graph
     dct = DetectionAlgorithm(detection_alg)
     community_structure = dct.compute_community(graph)
-    # Choose one of the communities found by the algorithm
+    # Choose one of the communities found by the algorithm, for now we choose the first one
     community_target = community_structure[0]
     print("* Community Detection Algorithm:", detection_alg)
     print("* Community Target:", community_target)
-    
-    # Define the environment and the number of possible actions
+    # Define beta, i.e. the percentage of edges to add/remove
+    beta = HyperParams.BETA.value
+    # Define the environment
     env = GraphEnvironment(beta=beta, debug=False)
     # Setup the environment
     env.setup(
@@ -42,7 +41,7 @@ if __name__ == "__main__":
         community=community_target,
         training=True,
         community_detection_algorithm=detection_alg)
-    # Get list of possible actions
+    # Get list of possible actions which can be performed on the graph by the agent
     possible_actions = env.get_possible_actions(graph, community_target)
     n_actions = len(possible_actions["ADD"]) + len(possible_actions["REMOVE"])
     print("* Number of possible actions:", n_actions)
@@ -84,8 +83,8 @@ if __name__ == "__main__":
     print("* Value for clipping the loss function: ", eps_clip)
     print("*", "-"*53)
 
-    random_seed = HyperParams.RANDOM_SEED.value
     # Set random seed
+    # random_seed = HyperParams.RANDOM_SEED.value
     # if random_seed:
     #     print("* Random Seed: {}".format(random_seed))
     #     torch.manual_seed(random_seed)
@@ -99,14 +98,9 @@ if __name__ == "__main__":
     # Set the update timestep to 10 times then edge budget
     update_timesteps = env.edge_budget*10
     # Start training
-    episodes_avg_reward, episode_length = train(
+    agent.train(
         env=env, 
-        agent=agent, 
         memory=memory, 
         max_timesteps=max_timesteps,
         update_timesteps=update_timesteps, 
         env_name=env_name)
-    
-    # ° ------ Plot Results ------ °#
-    # Plot the average reward per episode
-    Utils.plot_avg_reward(episodes_avg_reward, episode_length, env_name)

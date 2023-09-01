@@ -70,10 +70,12 @@ class DeceptionScore(object):
         # Ideal situation occurs when each member of the community target is 
         # placed in a different community and the value of the maximum recall 
         # is lower possible.
+        assert len(self.community_target) - 1 > 0, "Community target must have at least 2 members."
         community_spread = 1 - (connected_components - 1) / (len(self.community_target) - 1)
         
         # Ideal situation occurs when each member of the community structure 
         # contains little percentage of the community target.
+        assert len(n_intersecting_nodes) > 0, "Community structure must have at least 1 member."
         community_hiding = 0.5 * (1 - recall) + 0.5 * (1 - precision / len(n_intersecting_nodes))
         
         # Deception score is the product of community spread and community hiding. 
@@ -83,7 +85,8 @@ class DeceptionScore(object):
 
 if __name__ == "__main__":
     # Test  
-    community = [1, 2, 3] # Community target to hide
+    # community = [1, 2, 3] # Community target to hide
+    community = [1]
     deception = DeceptionScore(community)
     
     # Completly Detected

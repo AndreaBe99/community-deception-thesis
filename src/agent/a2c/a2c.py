@@ -21,8 +21,6 @@ class ActorCritic(nn.Module):
         actor_cfg = {
             # Encoder
             'g_in_size': state_dim,
-            'g_hidden_size_1': HyperParams.G_HIDDEN_SIZE_1.value,
-            'g_hidden_size_2': HyperParams.G_HIDDEN_SIZE_2.value,
             'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
             
             # Actor
@@ -33,8 +31,6 @@ class ActorCritic(nn.Module):
         critic_cfg = {
             # Encoder
             'g_in_size': state_dim,
-            'g_hidden_size_1': HyperParams.G_HIDDEN_SIZE_1.value,
-            'g_hidden_size_2': HyperParams.G_HIDDEN_SIZE_2.value,
             'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
 
             # Critic

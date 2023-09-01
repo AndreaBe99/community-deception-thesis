@@ -1,5 +1,5 @@
 """Module for the agent class"""
-from src.agent.a2c.network import ActorCritic
+from src.agent.a2c.a2c import ActorCritic
 from src.agent.a2c.memory import Memory
 from src.environment.graph_env import GraphEnvironment
 from src.utils.utils import HyperParams, FilePaths, Utils
@@ -33,8 +33,7 @@ class Agent:
         self.optimizer = torch.optim.Adam(
             filter(lambda p: p.requires_grad, self.policy.parameters()), lr=lr)#, betas=betas)
 
-        self.policy_old = ActorCritic(
-            state_dim, action_dim, action_std).to(self.device)
+        self.policy_old = ActorCritic(state_dim, action_dim, action_std).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -56,11 +55,11 @@ class Agent:
             Action to take
         """
         # ! OLD
-        # return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
+        return self.policy_old.act(state, memory).cpu().data.numpy().flatten()
         
         # ! NEW
-        with torch.no_grad():
-            action = self.policy_old.act(state, memory)
+        # with torch.no_grad():
+        #    action = self.policy_old.act(state, memory)
         return action.cpu().data.numpy().flatten()
     
     def update(self, memory: Memory):

@@ -3,8 +3,8 @@ from src.community_algs.detection_algs import DetectionAlgorithm
 from src.environment.graph_env import GraphEnvironment
 from src.agent.a2c.memory import Memory
 from src.agent.agent import Agent
-import os
-os.environ['DGLBACKEND'] = 'pytorch'
+import random
+
 
 if __name__ == "__main__":
     print("*"*20, "Setup Information", "*"*20)
@@ -23,84 +23,47 @@ if __name__ == "__main__":
     # ° --- Environment Setup --- ° #
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
     detection_alg = DetectionAlgorithms.WALK.value
+    print("* Community Detection Algorithm:", detection_alg)
     # Apply the community detection algorithm on the graph
     dct = DetectionAlgorithm(detection_alg)
     community_structure = dct.compute_community(graph)
-    # Choose one of the communities found by the algorithm, for now we choose the first one
-    community_target = community_structure[0]
-    print("* Community Detection Algorithm:", detection_alg)
+    # Choose one of the communities found by the algorithm, for now we choose 
+    # the community with the highest number of nodes
+    community_target = max(community_structure, key=len)
     print("* Community Target:", community_target)
-    # Define beta, i.e. the percentage of edges to add/remove
-    beta = HyperParams.BETA.value
+    # TEST: Choose a node to remove from the community
+    nodes_target = community_target[0:-3]
+    print("* Nodes Target:", nodes_target)
+    
     # Define the environment
-    env = GraphEnvironment(beta=beta, debug=False)
-    # Setup the environment
-    env.setup(
+    env = GraphEnvironment(
         graph=graph,
         community=community_target,
+        nodes_target=nodes_target,
+        beta=HyperParams.BETA.value, # % of actions to perform
+        weight=HyperParams.WEIGHT.value, # weight to balance the reward
+        debug=False, 
         training=True,
+        env_name=env_name,
         community_detection_algorithm=detection_alg)
     # Get list of possible actions which can be performed on the graph by the agent
-    possible_actions = env.get_possible_actions(graph, community_target)
-    n_actions = len(possible_actions["ADD"]) + len(possible_actions["REMOVE"])
+    n_actions = len(env.possible_actions["ADD"]) + \
+        len(env.possible_actions["REMOVE"])
     print("* Number of possible actions:", n_actions)
 
     # ° ------ Agent Setup ------ ° #
-    # Dimensions of the state
-    state_dim = HyperParams.G_IN_SIZE.value
-    # Number of possible actions
-    action_dim = n_actions
-    # Standard deviation for the action
-    action_std = HyperParams.ACTION_STD.value
-    # Learning rate
-    lr = HyperParams.LR.value
-    # Gamma parameter
-    gamma = HyperParams.GAMMA.value
-    # Number of epochs when updating the policy
-    k_epochs = HyperParams.K_EPOCHS.value
-    # Value for clipping the loss function
-    eps_clip = HyperParams.EPS_CLIP.value
     # Define the agent
     agent = Agent(
-        state_dim=state_dim,
-        action_dim=action_dim,
-        action_std=action_std,
-        lr=lr,
-        gamma=gamma,
-        K_epochs=k_epochs,
-        eps_clip=eps_clip)
+        state_dim=HyperParams.G_IN_SIZE.value,      # Dimensions of the state
+        action_dim=graph.number_of_nodes(),         # Number of possible actions
+        action_std=HyperParams.ACTION_STD.value,    # Standard deviation for the action
+        lr=HyperParams.LR.value,                    # Learning rate
+        gamma=HyperParams.GAMMA.value,              # Gamma parameter
+        eps=HyperParams.EPS_CLIP.value,)            # Value for clipping the loss function
     # Define Memory
-    memory = Memory()
-    # Print Hyperparameters
-    print("*", "-"*18, "Hyperparameters", "-"*18)
-    print("* State dimension: ", state_dim)
-    print("* Action dimension: ", action_dim)
-    print("* Action standard deviation: ", action_std)
-    print("* Learning rate: ", lr)
-    print("* Gamma parameter: ", gamma)
-    print("* Number of epochs when updating the policy: ", k_epochs)
-    print("* Value for clipping the loss function: ", eps_clip)
+    # memory = Memory()
     print("*", "-"*53)
-
-    # Set random seed
-    # random_seed = HyperParams.RANDOM_SEED.value
-    # if random_seed:
-    #     print("* Random Seed: {}".format(random_seed))
-    #     torch.manual_seed(random_seed)
-    #     env.seed(random_seed)
-    #     np.random.seed(random_seed)
     print("*"*20, "End Information", "*"*20, "\n")
-
-    # ° ------ Model Training ------ ° #
-    # Set the maximum number of steps per episode to the double of the edge budget
-    max_timesteps = env.edge_budget*2
-    # Set the update timestep to 10 times then edge budget
-    update_timesteps = env.edge_budget*10
-    # Start training
-    agent.train(
-        env=env, 
-        memory=memory, 
-        max_timesteps=max_timesteps,
-        update_timesteps=update_timesteps, 
-        env_name=env_name,
-        detection_alg=detection_alg)
+    
+    log = agent.training(env, env_name, detection_alg)
+    Utils.plot_training(log, env_name, detection_alg)

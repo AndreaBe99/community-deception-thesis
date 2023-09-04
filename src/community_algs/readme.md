@@ -21,6 +21,12 @@ The file `deception_score.py` is a Python module for calculating the **deception
 It defines a class called `DeceptionScore` that has an init method that initializes the object with a list of integers representing the target community, i.e., the community that we want to hide in the graph. 
 The class also has two static methods called `recall` and `precision` that calculate the recall and precision scores of a given community, respectively. The recall score measures the proportion of members in the target community that are also in the detected community, while the precision score measures the proportion of members in the detected community that are also in the target community. Finally, the class has a method called `compute_deception_score` that calculates the deception score of a community detection algorithm given the community structure and the number of connected components in the graph.
 
+## Node Safeness
+
+Let $G=(V,E)$ be a network, $C \subset V$ a community, and $u \in C$ a member of $C$. The safeness $\sigma(u,C)$ of $u$ in $G$ is defined as:
+$$\begin{equation} \sigma ({u},{\mathcal{C}}):=\frac{1}{2}\frac{|{V}_{\mathcal{C}}^{u}|-|E(u,\mathcal{C})|}{|\mathcal{C}|-1}+\frac{1}{2} \frac{|\widetilde{E}(u,\mathcal{C})|}{deg(u)}, \end{equation}$$
+where $V^u_C ⊆ C$ is the set of nodes reachable from $u$ passing only via nodes in $C$, and we indicate with $E(u,\bar{V})$ (resp., $\tilde{E}(u,\bar{V})$) the set of intra-community (resp., inter-community) edges for a node $u \in \bar{V}$.
+
 ## Normalized Mutual Information (NMI)
 
 The file `nmi.py` is a Python implementation of a class called `NMI` that calculates the **normalized mutual information** between two sets of communities.

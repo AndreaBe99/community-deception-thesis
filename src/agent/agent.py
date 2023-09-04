@@ -97,7 +97,7 @@ class Agent:
         self,
         env_name: str = 'default',
         detection_alg: str = 'default',
-        log_dir: str = FilePaths.LOG_DIR.value):
+        log_dir: str = FilePaths.TEST_DIR.value):
         """Save checkpoint"""
         log_dir = log_dir + env_name + '/' + detection_alg
         # Check if the directory exists, otherwise create it
@@ -110,10 +110,10 @@ class Agent:
         torch.save(checkpoint, path)
 
     def load_checkpoint(
-        self,
-        env_name: str = 'default',
-        detection_alg: str = 'default',
-        log_dir: str = FilePaths.LOG_DIR.value):
+            self,
+            env_name: str = 'default',
+            detection_alg: str = 'default',
+            log_dir: str = FilePaths.TEST_DIR.value):
         """Load checkpoint
         
         Parameters
@@ -137,7 +137,7 @@ class Agent:
         log_dict:dict, 
         env_name: str = 'default',
         detection_alg: str = 'default',
-        log_dir: str = FilePaths.LOG_DIR.value):
+        log_dir: str = FilePaths.TEST_DIR.value):
         """Log data
         
         Parameters

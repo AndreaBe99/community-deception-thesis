@@ -2,19 +2,22 @@
 from src.agent.a2c.actor import ActorNetwork
 from src.agent.a2c.critic import CriticNetwork
 from src.agent.a2c.memory import Memory
-from src.utils.utils import HyperParams
+from src.utils.utils import HyperParams, FilePaths, Utils
 
 from torch.distributions import MultivariateNormal
 from torch_geometric.data import Data
-
-from typing import Tuple
+from torch.nn import functional as F
 from torch import nn
+from collections import namedtuple
+
+from typing import Tuple, List
 
 import torch
 
 
 class ActorCritic(nn.Module):
     """ActorCritic Network"""
+
     def __init__(self, state_dim, action_dim, action_std):
         super(ActorCritic, self).__init__()
         # action mean range -1 to 1
@@ -22,7 +25,7 @@ class ActorCritic(nn.Module):
             # Encoder
             'g_in_size': state_dim,
             'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
-            
+
             # Actor
             'hidden_size_1': HyperParams.HIDDEN_SIZE_1.value,
             'hidden_size_2': HyperParams.HIDDEN_SIZE_2.value,
@@ -38,73 +41,28 @@ class ActorCritic(nn.Module):
         }
         self.actor = ActorNetwork(**actor_cfg)
         self.critic = CriticNetwork(**critic_cfg)
+        self.device = torch.device(
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    def forward(self, state: Data, jitter=1e-20) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass
         
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.action_var = torch.full(
-            (action_dim,), action_std*action_std).to(self.device)
-
-    def forward(self):
-        """Forward pass"""
-        raise NotImplementedError
-
-    def act(
-        self, 
-        state: Data,
-        memory: Memory)-> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Compute the action to take given the current state
-
         Parameters
         ----------
-        state : torch.Tensor
-            Current state
-        memory : Memory
-            Memory object
-
+        state : Data
+            Graph state
+        jitter : float, optional
+            Jitter value, by default 1e-20
+        
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor]
-            The action to take and the log probability of the action
+            Tuple of concentration and value
         """
-        action_mean = self.actor(state)
-        
-        cov_mat = torch.diag(self.action_var).to(self.device)
-        dist = MultivariateNormal(action_mean, cov_mat)
-        action = dist.sample()
-        action_logprob = dist.log_prob(action)
-
-        memory.states.append(state)
-        memory.actions.append(action)
-        memory.logprobs.append(action_logprob)
-
-        return action.detach()
-        #return action.detach(), action_logprob.detach()
+        # Actor
+        probs = self.actor(state)
+        concentration = F.softplus(probs).reshape(-1) + jitter
+        # Critic
+        value = self.critic(state)
+        return concentration, value
     
-    def evaluate(self, state: torch.Tensor, action)-> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Evaluate the current state and action
-
-        Parameters
-        ----------
-        state : _type_
-            _description_
-        action : _type_
-            _description_
-
-        Returns
-        -------
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-            The log probability of the action, the state value, and the entropy
-        """
-        action_mean = self.actor(state)
-
-        action_var = self.action_var.expand_as(action_mean)
-        cov_mat = torch.diag_embed(action_var).to(self.device)
-
-        dist = MultivariateNormal(action_mean, cov_mat)
-
-        action_logprobs = dist.log_prob(action)
-        dist_entropy = dist.entropy()
-        state_value = self.critic(state)
-
-        return action_logprobs, state_value, dist_entropy

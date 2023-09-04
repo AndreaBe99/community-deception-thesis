@@ -42,7 +42,7 @@ class ActorNetwork(nn.Module):
     def forward(self, state: Data):
         # embedding = F.relu(self.gcnconv(state.x, state.edge_index))
         # embedding = embedding + state.x
-        embedding = self.graph_encoder(state.x, state.edge_index)
+        embedding = self.graph_encoder(state)
         actions = F.relu(self.linear1(embedding))
         actions = F.relu(self.linear2(actions))
         actions = self.linear3(actions)

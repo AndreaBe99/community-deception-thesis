@@ -15,6 +15,7 @@ class FilePaths(Enum):
     # ° Local
     DATASETS_DIR = 'dataset/data'
     LOG_DIR    = 'src/logs/'
+    TEST_DIR = 'test/'
     # ° Kaggle
     # DATASETS_DIR = '/kaggle/input/network-community'
     # LOG_DIR    = 'logs/'
@@ -78,7 +79,7 @@ class HyperParams(Enum):
     BETA = 30  # Numeber of possible action with BETA=30, is 30% of the edges
     DEBUG = False
     # Weight to balance the reward between NMI and Deception Score
-    WEIGHT = 1# 0.9
+    WEIGHT = 0.7
 
 
 class DetectionAlgorithms(Enum):
@@ -210,7 +211,7 @@ class Utils:
         log: dict, 
         env_name: str, 
         detection_algorithm: str,
-        file_path: str = FilePaths.LOG_DIR.value):
+        file_path: str = FilePaths.TEST_DIR.value):
         """Plot the training results
 
         Parameters
@@ -274,7 +275,7 @@ class Utils:
             hyperparameters: dict,
             env_name: str,
             detection_algorithm: str,
-            file_path: str = FilePaths.LOG_DIR.value):
+            file_path: str = FilePaths.TEST_DIR.value):
         """
         Write the episodes_avg_reward, episode_length, and hyperparameters to a JSON file.
 

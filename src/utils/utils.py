@@ -53,12 +53,12 @@ class HyperParams(Enum):
     HIDDEN_SIZE_2 = 128
     ACTION_STD = 0.5
     EPS_CLIP = 0.2
-    LR = 0.0003
+    LR = 1e-3
     GAMMA = 0.99
 
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 200          # 15000
+    MAX_EPISODES = 1000 # 200 # 15000
     # Maximum number of time steps per episode
     MAX_TIMESTEPS = 10  # ! Unused, I set it to the double of the edge budget
     # Update the policy after N timesteps
@@ -77,7 +77,8 @@ class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     BETA = 30  # Numeber of possible action with BETA=30, is 30% of the edges
     DEBUG = False
-    WEIGHT = 0.8
+    # Weight to balance the reward between NMI and Deception Score
+    WEIGHT = 1# 0.9
 
 
 class DetectionAlgorithms(Enum):
@@ -202,6 +203,67 @@ class Utils:
         plt.title(f"Training {env_name}")
         plt.savefig(
             f"{file_path}{env_name}_{detection_algorithm}_training_loss.png")
+        plt.show()
+    
+    @staticmethod
+    def plot_training(
+        log: dict, 
+        env_name: str, 
+        detection_algorithm: str,
+        file_path: str = FilePaths.LOG_DIR.value):
+        """Plot the training results
+
+        Parameters
+        ----------
+        log : dict
+            Dictionary containing the training logs
+        env_name : str
+            Name of the environment
+        detection_algorithm : str
+            Name of the detection algorithm
+        file_path : str, optional
+            Path to save the plot, by default FilePaths.LOG_DIR.value
+        """
+        file_path = file_path + env_name + '/' + detection_algorithm
+        # Plot the average reward and the time steps of the episodes in the same
+        # plot, using matplotlib, where the average reward is the blue line and
+        # the episode length are the orange line.
+        _, ax1 = plt.subplots()
+        color = 'tab:blue'
+        ax1.set_xlabel('Episode')
+        ax1.set_ylabel('Average Reward', color=color)
+        ax1.plot(log["train_avg_reward"], color=color)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        ax2 = ax1.twinx()
+        color = 'tab:orange'
+        ax2.set_ylabel('Time Steps', color=color)
+        ax2.plot(log["train_steps"], color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
+
+        plt.title(f"Training on {env_name} graph with {detection_algorithm} algorithm")
+        plt.savefig(
+            f"{file_path}/{env_name}_{detection_algorithm}_training_reward.png")
+        plt.show()
+        
+        # Plot the Actor and Critic loss in the same plot, using matplotlib
+        # with the Actor loss in green and the Critic loss in red.
+        _, ax1 = plt.subplots()
+        color = 'tab:green'
+        ax1.set_xlabel('Episode')
+        ax1.set_ylabel('Actor Loss', color=color)
+        ax1.plot(log["a_loss"], color=color)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        ax2 = ax1.twinx()
+        color = 'tab:red'
+        ax2.set_ylabel('Critic Loss', color=color)
+        ax2.plot(log["v_loss"], color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
+
+        plt.title(f"Training on {env_name} graph with {detection_algorithm} algorithm")
+        plt.savefig(
+            f"{file_path}/{env_name}_{detection_algorithm}_training_loss.png")
         plt.show()
 
     @staticmethod

@@ -24,27 +24,28 @@ class ActorNetwork(nn.Module):
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_rl')
         
-        self.graph_encoder = GraphEncoder(
-            in_feature=g_in_size, 
-            embdedding_size=g_embedding_size,
-            )
-        
-        self.linear1 = nn.Linear(g_embedding_size, hidden_size_1)
+        self.graph_encoder = GraphEncoder(g_in_size)
         # self.linear1 = nn.Linear(g_embedding_size, hidden_size_1)
-        self.linear2 = nn.Linear(hidden_size_1, hidden_size_2)
-        self.linear3 = nn.Linear(hidden_size_2, nb_actions)
-        
+        # self.linear2 = nn.Linear(hidden_size_1, hidden_size_2)
+        # self.linear3 = nn.Linear(hidden_size_2, nb_actions)
+        # TEST
+        self.gcnconv = GCNConv(g_in_size, g_in_size)
+        self.linear1 = nn.Linear(g_in_size, 32)
+        self.linear2 = nn.Linear(32, 32)
+        self.linear3 = nn.Linear(32, 1)
+
         self.nb_actions = nb_actions
         self.device = torch.device(
             'cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
     def forward(self, state: Data):
-        embedding = self.graph_encoder(state)
+        # embedding = F.relu(self.gcnconv(state.x, state.edge_index))
         # embedding = embedding + state.x
+        embedding = self.graph_encoder(state.x, state.edge_index)
         actions = F.relu(self.linear1(embedding))
         actions = F.relu(self.linear2(actions))
-        actions = F.softmax(self.linear3(actions))
+        actions = self.linear3(actions)
         return actions
 
     def save_checkpoint(self):

@@ -17,26 +17,7 @@ import torch
 
 
 class GraphEnvironment(object):
-    """Enviroment where the agent will act, it will be a graph with a community
-    
-    Methods
-    -------
-    get_edge_budget(graph, beta) -> int
-        Computes the edge budget for each graph
-    get_reward(deception_score, nmi_score) -> float
-        Computes the reward for the agent
-    reset() -> Data
-        Reset the environment
-    step(actions) -> Tuple[Data, float]
-        Step function for the environment
-    get_possible_actions() -> List[Tuple[int, int]]
-        Returns the possible actions that can be applied to the graph.
-    apply_action(actions) -> int
-        Applies the action to the graph, if there is an edge between the two
-        nodes, it removes it, otherwise it adds it
-    plot_graph() -> None
-        Plot the graph using matplotlib
-    """
+    """Enviroment where the agent will act, it will be a graph with a community"""
 
     def __init__(
         self, 
@@ -102,9 +83,12 @@ class GraphEnvironment(object):
         
         # Compute the edge budget for the graph
         self.edge_budget = self.get_edge_budget()
+        # Amount of budget used
         self.used_edge_budget = 0
+        # Whether the budget for the graph rewiring is exhausted
         self.exhausted_budget = False
         self.rewards = 0
+        # Reward of the previous step
         self.old_rewards = 0
         
         # Compute the set of possible actions
@@ -115,6 +99,31 @@ class GraphEnvironment(object):
         self.device = torch.device(
             'cuda:0' if torch.cuda.is_available() else 'cpu')
 
+    def change_target_node(self, nodes_target: List[int]) -> None:
+        """Change the target node to remove from the community
+
+        Parameters
+        ----------
+        nodes_target : List[int]
+            Nodes we want to remove from the community
+        """
+        self.nodes_target = nodes_target
+        # We need to initialize metrics objects again
+        self.safeness = Safeness(self.graph, self.community_target, self.nodes_target)
+    
+    def change_target_community(self, community: List[int]) -> None:
+        """Change the target community from which we want to hide the node
+
+        Parameters
+        ----------
+        community : List[int]
+            Community of node we want to remove from it
+        """
+        self.community_target = community
+        # We need to initialize metrics objects again
+        self.deception = DeceptionScore(self.community_target)
+        self.safeness = Safeness(self.graph, self.community_target, self.nodes_target)
+    
     def get_edge_budget(self) -> int:
         """Computes the edge budget for each graph
 
@@ -125,23 +134,24 @@ class GraphEnvironment(object):
         """
         return int(math.ceil((self.graph.number_of_edges() * self.beta / 100)))
 
-    def get_reward(self, deception_score: float, nmi_score: float) -> float:
+    def get_reward(self, safeness: float, nmi_score: float) -> float:
         """
         Computes the reward for the agent
         
         Parameters
         ----------
-        deception_score : float
-            Deception score
+        safeness : float
+            Node safeness, value between 0 and 1, we want to minimize it
         nmi_score : float
-            Normalized Mutual Information score
+            Normalized Mutual Information score, value between 0 and 1, we want
+            to maximize it
 
         Returns
         -------
         reward : float
             Reward
         """
-        reward = self.weight * deception_score + (1 - self.weight) * (1-nmi_score)
+        reward = self.weight * (1-safeness) + (1 - self.weight) * nmi_score
         return reward
 
     
@@ -181,59 +191,60 @@ class GraphEnvironment(object):
         self.graph, self.rewards: Tuple[torch.Tensor, float]
             Tuple containing the new graph and the reward 
         """
-        # Compute the remaining budget
-        remaining_budget = self.edge_budget - self.used_edge_budget
-        
+        # ° ---- ACTION ---- ° #
         # Take action, budget_consumed can be 0 or 1, i.e. if the action has
         # been applied or not
         budget_consumed = self.apply_action(actions)
-        # Decrease the remaining budget
-        updated_budget = remaining_budget - budget_consumed
-        
-        # Compute the new Community Structure
+        # Compute the new Community Structure after the action
         self.community_structure_new = self.detection.compute_community(self.graph)
         
-        # Now we have the old and the new community structure, we can compute
-        # the NMI score
+        # ° ---- METRICS ---- ° #
+        # Normalized Mutual Information, value between 0 and 1
         nmi = self.nmi.compute_nmi(self.community_structure_old, self.community_structure_new)
-        # Compute new deception score
+        # Deception Score, value between 0 and 1
         # deception_score = self.deception.compute_deception_score(self.community_structure_new, self.n_connected_components)
-        # Compute the node safeness
-        # TEST node_safeness = self.safeness.compute_community_safeness(self.nodes_target)
-        node_safeness = self.safeness.compute_node_safeness(self.nodes_target[0])
-        if self.debug:
-            print("Community Structure Old:", self.community_structure_new)
-            # print("Deception Score:", deception_score)
-            print("NMI Score:", nmi)
+        # Safeness, value between 0 and 1
+        # node_safeness = self.safeness.compute_community_safeness(self.nodes_target)
+        node_safeness = self.safeness.compute_node_safeness(self.nodes_target[0]) # ! Assume that there is only one node to hide
         
-        # Compute the reward, using the deception score and the NMI score
-        # reward = self.get_reward(deception_score, nmi)
+        # ° ---- REWARD ---- ° #
         reward = self.get_reward(node_safeness, nmi)
-        # TEST Subtract the old reward from the new reward 
+        # TEST:  Experiment with different reward penalization
+        # If the action is not applied, penalize the reward
         if budget_consumed == 0:
             reward = -1
+        # Add a multiplicative factor to the reward
         reward *= 2*budget_consumed
+        # TEST END
+        # Subtract the old reward from the new reward
         reward -= self.old_rewards
-        
-
-        if abs(reward) < self.eps:
-            reward = 0
+        # Set the reward to 0 if it is less than the epsilon
+        # if abs(reward) < self.eps:
+        #    reward = 0
         self.rewards = reward
+        # Reset the old reward
         self.old_rewards = reward
         
+        # ° ---- BUDGET ---- ° #
+        # Compute the remaining budget
+        remaining_budget = self.edge_budget - self.used_edge_budget
+        # Decrease the remaining budget
+        updated_budget = remaining_budget - budget_consumed
         # Update the used edge budget
         self.used_edge_budget += (remaining_budget - updated_budget)
         # If the budget for the graph rewiring is exhausted, stop the episode
         if remaining_budget < 1:
-            # print("*", "-" * 19, "Budget exhausted", "-" * 19)
             self.exhausted_budget = True
 
+        # ° ---- PyG Data ---- ° #
         # Return a PyG Data object
         data = from_networkx(self.graph)
         # Assign the node features and the batch of the old graph to the new graph
         data.x = self.data_pyg.x
         data.batch = self.data_pyg.batch
+        # Update the old graph pyg data object
         self.data_pyg = data
+        del data
         return self.data_pyg.to(self.device), self.rewards, self.exhausted_budget
     
     # TEST Goal: remove a node from a community

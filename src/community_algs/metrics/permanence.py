@@ -66,10 +66,8 @@ class PermanenceCalculator:
     def internal_clustering_coefficient(self, v: int)->float:
         """
         Compute the internal clustering coefficient of a node v in a graph G
-        denoted by the ratio of the existing connections and the total number 
-        of possible connections among the internal neighbors of v.
-        Assume thaat each community has a minimum of 3 nodes and 3 internal
-        connections, otherwise the internal clustering coefficient is 0.
+        denoted by the fraction of actual and possible number of edges among 
+        the internal neighbors of v.
 
         Parameters
         ----------
@@ -83,8 +81,21 @@ class PermanenceCalculator:
         """
         # Get subgraph of the community
         community_subgraph = self.graph.subgraph(self.community_target)
-        clustering_coefficient = nx.clustering(community_subgraph, v)
-        return clustering_coefficient
+        
+        # Delete node v from the subgraph
+        subgraph_copy = community_subgraph.copy()
+        subgraph_copy.remove_node(v)
+        
+        # Compute the number of actual edges, excluding the edges of node v
+        n_actual_edges = subgraph_copy.number_of_edges()
+        
+        # Compute the number of possible edges, excluding the edges of node v
+        n_nodes = subgraph_copy.number_of_nodes()
+        num_possible_edges = (n_nodes * (n_nodes - 1)) / 2
+        del subgraph_copy
+        del community_subgraph
+        return n_actual_edges / num_possible_edges
+
 
     def permanence(self, v: int)->float:
         """
@@ -109,9 +120,6 @@ class PermanenceCalculator:
         C_in_v = self.internal_clustering_coefficient(v)
         assert E_max_v > 0, "E_max_v must be greater than 0"
         assert deg_v > 0, "deg_v must be greater than 0"
-        print(f"I_v: {I_v}")
-        print(f"E_max_v: {E_max_v}")
-        print(f"deg_v: {deg_v}")
         permanence_v = (I_v / E_max_v) * (1 / deg_v) - (1 - C_in_v)
         return permanence_v
     
@@ -147,10 +155,10 @@ if __name__ == "__main__":
     
     
     import sys
-    sys.path.append("../../")
+    sys.path.append("../../../")
     from src.community_algs.detection_algs import DetectionAlgorithm
     community_structure = DetectionAlgorithm("walktrap").compute_community(graph)
-    community_target = community_structure[4]
+    community_target = community_structure[2]
     print(f"Community target: {community_target}")
     print(f"Community structure: {community_structure}")
     

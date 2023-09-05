@@ -10,8 +10,11 @@ if __name__ == "__main__":
     print("*"*20, "Setup Information", "*"*20)
 
     # ° ------ Graph Setup ------ ° #
-    # ! Graph path (change the following line to change the graph)
+    # ! REAL GRAPH Graph path (change the following line to change the graph)
     graph_path = FilePaths.KAR.value
+    # ! SYNTHETIC GRAPH Graph path (change the following line to change the graph)
+    # graph, graph_path = Utils.generate_lfr_benchmark_graph()
+    
     # Set the environment name as the graph name
     env_name = graph_path.split("/")[-1].split(".")[0]
     # Load the graph from the dataset folder
@@ -32,7 +35,7 @@ if __name__ == "__main__":
     community_target = max(community_structure, key=len)
     print("* Community Target:", community_target)
     # TEST: Choose a node to remove from the community
-    nodes_target = community_target[0:-3]
+    nodes_target = [community_target[0]]
     print("* Nodes Target:", nodes_target)
     
     # Define the environment
@@ -66,4 +69,7 @@ if __name__ == "__main__":
     print("*"*20, "End Information", "*"*20, "\n")
     
     log = agent.training(env, env_name, detection_alg)
-    Utils.plot_training(log, env_name, detection_alg)
+    file_path = FilePaths.TEST_DIR.value + env_name + '/' + detection_alg
+    Utils.check_dir(file_path)
+    Utils.save_training(log, env_name, detection_alg, file_path=file_path)
+    Utils.plot_training(log, env_name, detection_alg, file_path=file_path)

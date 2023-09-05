@@ -1,8 +1,8 @@
 """Module for the GraphEnviroment class"""
-from src.community_algs.nmi import NormalizedMutualInformation
-from src.community_algs.deception_score import DeceptionScore
+from src.community_algs.metrics.nmi import NormalizedMutualInformation
+from src.community_algs.metrics.deception_score import DeceptionScore
 from src.community_algs.detection_algs import DetectionAlgorithm
-from src.community_algs.safeness import Safeness
+from src.community_algs.metrics.safeness import Safeness
 from src.utils.utils import DetectionAlgorithms
 from src.utils.utils import HyperParams
 from torch_geometric.utils import from_networkx
@@ -141,7 +141,7 @@ class GraphEnvironment(object):
         reward : float
             Reward
         """
-        reward = self.weight * deception_score + (1 - self.weight) * nmi_score
+        reward = self.weight * deception_score + (1 - self.weight) * (1-nmi_score)
         return reward
 
     
@@ -199,7 +199,8 @@ class GraphEnvironment(object):
         # Compute new deception score
         # deception_score = self.deception.compute_deception_score(self.community_structure_new, self.n_connected_components)
         # Compute the node safeness
-        node_safeness = self.safeness.compute_community_safeness(self.nodes_target)
+        # TEST node_safeness = self.safeness.compute_community_safeness(self.nodes_target)
+        node_safeness = self.safeness.compute_node_safeness(self.nodes_target[0])
         if self.debug:
             print("Community Structure Old:", self.community_structure_new)
             # print("Deception Score:", deception_score)
@@ -282,10 +283,10 @@ class GraphEnvironment(object):
         for u in self.graph.nodes():
             if self.nodes_target is None:
                 for v in self.graph.nodes():
-                    in_community_and_not_v(u, v)
+                    in_community_and_not_v(v, u)
             else:
                 for node in self.nodes_target:
-                    in_community_and_not_v(u, node)
+                    in_community_and_not_v(node, u)
         return possible_actions
     
     def apply_action(self, actions: np.array) -> int:
@@ -303,9 +304,15 @@ class GraphEnvironment(object):
         budget_consumed : int
             Amount of budget consumed
         """
-        # TEST: actions is a list longer as the number of nodes in the graph
-        # TEST  choose the two nodes with the highest value in the list
-        action = np.argsort(actions)[-2:]
+        # NOTE: actions is a list longer as the number of nodes in the graph
+        # NOTE  choose the two nodes with the highest value in the list
+        # action = np.argsort(actions)[-2:]
+        
+        # TEST Consider only one target node and use it as source node, and
+        # TEST  choose the destination node with the highest value in the list
+        node_dest = np.argmax(actions)
+        action = (self.nodes_target[0], node_dest)
+        
         # We need to take into account both the actions (u,v) and (v,u)
         action = (action[0], action[1])
         action_reversed = (action[1], action[0])

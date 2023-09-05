@@ -75,6 +75,18 @@ class Agent:
         return optimizers
 
     def select_action(self, state: Data)->List[float]:
+        """Select action
+        
+        Parameters
+        ----------
+        state : Data
+            Graph state
+        
+        Returns
+        -------
+        List[float]
+            List of action probabilities
+        """
         concentration, value = self.policy.forward(state)
         dist = torch.distributions.Dirichlet(concentration)
         action = dist.sample()
@@ -97,9 +109,9 @@ class Agent:
         self,
         env_name: str = 'default',
         detection_alg: str = 'default',
-        log_dir: str = FilePaths.TEST_DIR.value):
+        log_dir: str = FilePaths.LOG_DIR.value):
         """Save checkpoint"""
-        log_dir = log_dir + env_name + '/' + detection_alg
+        log_dir = log_dir + env_name# + '/' + detection_alg
         # Check if the directory exists, otherwise create it
         Utils.check_dir(log_dir)
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
@@ -113,7 +125,7 @@ class Agent:
             self,
             env_name: str = 'default',
             detection_alg: str = 'default',
-            log_dir: str = FilePaths.TEST_DIR.value):
+            log_dir: str = FilePaths.LOG_DIR.value):
         """Load checkpoint
         
         Parameters
@@ -125,7 +137,7 @@ class Agent:
         log_dir : str, optional
             Path to the log directory, by default FilePaths.LOG_DIR.value
         """
-        log_dir = log_dir + env_name + '/' + detection_alg
+        log_dir = log_dir + env_name# + '/' + detection_alg
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
         checkpoint = torch.load(path)
         self.policy.load_state_dict(checkpoint['model'])
@@ -137,7 +149,7 @@ class Agent:
         log_dict:dict, 
         env_name: str = 'default',
         detection_alg: str = 'default',
-        log_dir: str = FilePaths.TEST_DIR.value):
+        log_dir: str = FilePaths.LOG_DIR.value):
         """Log data
         
         Parameters
@@ -151,12 +163,15 @@ class Agent:
         log_dir : str, optional
             Path to the log directory, by default FilePaths.LOG_DIR.value
         """
-        log_dir = log_dir + env_name + '/' + detection_alg
+        log_dir = log_dir + env_name # + '/' + detection_alg
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
         torch.save(log_dict, path)
     
     def training_step(self)->Tuple[float, float]:
-        """Training step
+        """
+        Perform a single training step of the A2C algorithm, which involves
+        computing the actor and critic losses, taking gradient steps, and 
+        resetting the rewards and action buffer.
         
         Returns
         -------
@@ -177,10 +192,13 @@ class Agent:
             R = r + self.gamma * R
             returns.insert(0, R)
 
+        # Normalize returns by subtracting mean and dividing by standard deviation
         returns = torch.tensor(returns)
         returns = (returns - returns.mean()) / (returns.std() + self.eps)
 
+        # Computing losses
         for (log_prob, value), R in zip(saved_actions, returns):
+            # Difference between true value and estimated value from critic
             advantage = R - value.item()
             # calculate actor (policy) loss
             policy_losses.append(-log_prob * advantage)
@@ -253,7 +271,7 @@ class Agent:
                 # Store the transition in memory
                 self.rewards.append(reward)
                 step += 1
-            # perform on-policy backprop
+            # perform on-policy backpropagation
             a_loss, v_loss = self.training_step()
             # Send current statistics to screen
             epochs.set_description(

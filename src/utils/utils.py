@@ -1,6 +1,6 @@
 """Module to store utility functions and constants"""
 from enum import Enum
-from typing import List
+from typing import List, Tuple
 import matplotlib.pyplot as plt
 import networkx as nx
 import scipy
@@ -76,7 +76,7 @@ class HyperParams(Enum):
     RANDOM_SEED = 42
 
     """Hyperparameters for the Environment"""
-    BETA = 30  # Numeber of possible action with BETA=30, is 30% of the edges
+    BETA = 10  # Numeber of possible action with BETA=30, is 30% of the edges
     DEBUG = False
     # Weight to balance the reward between NMI and Deception Score
     WEIGHT = 0.7
@@ -132,6 +132,55 @@ class Utils:
         except Exception as exception:
             print("Error: ", exception)
             return None
+    
+    @staticmethod
+    def generate_lfr_benchmark_graph(
+        n: int=10000,
+        tau1: float=3,
+        tau2: float=1.5,
+        mu: float=0.1,              # TODO: Test also 0.3 and 0.6
+        average_degree: float=5, 
+        min_community: int=20, 
+        seed: int=10)->Tuple[nx.Graph, str]:
+        """
+        Generate a LFR benchmark graph for community detection algorithms.
+
+        Parameters
+        ----------
+        n : int, optional
+            _description_, by default 250
+        tau1 : float, optional
+            _description_, by default 3
+        tau2 : float, optional
+            _description_, by default 1.5
+        mu : float, optional
+            _description_, by default 0.1
+        average_degree : float, optional
+            _description_, by default 5
+        min_community : int, optional
+            _description_, by default 20
+        seed : int, optional
+            _description_, by default 10
+
+        Returns
+        -------
+        nx.Graph
+            Synthetic graph generated with the LFR benchmark
+        file_path : str
+            Path to the file where the graph is saved
+        """
+        graph = nx.generators.community.LFR_benchmark_graph(
+            n=n,
+            tau1=tau1,
+            tau2=tau2,
+            mu=mu,
+            average_degree=average_degree,
+            min_community=min_community,
+            seed=seed)
+        file_path = FilePaths.DATASETS_DIR.value + f"/lfr_benchmark_mu-{mu}.mtx"
+        nx.write_edgelist(graph, file_path, data=False)
+        return graph, file_path
+        
     @staticmethod
     def check_dir(path: str):
         """
@@ -145,73 +194,13 @@ class Utils:
         if not os.path.exists(path):
             os.makedirs(path)
     
-    @staticmethod
-    def plot_avg_reward(
-            log_reward: List[float],
-            log_timesteps: List[int],
-            log_loss: List[float],
-            env_name: str,
-            detection_algorithm: str,
-            file_path: str = FilePaths.LOG_DIR.value):
-        """
-        Plot the average reward and the time steps of the episodes in the same
-        plot, using matplotlib, where the average reward is the blue line and
-        the episode length are the orange line, and the loss in a different
-        image.
-
-        Parameters
-        ----------
-        log_reward : List[float]
-            Average reward for each episode
-        log_timesteps : List[int]
-            Time steps for each episode
-        log_loss : List[float]
-            Loss for each episode
-        env_name : str
-            Environment name
-        detection_algorithm : str
-            Detection algorithm used
-        file_path : str, optional
-            Path to save the plot, by default "src/logs/"
-        """
-        _, ax1 = plt.subplots()
-
-        color = 'tab:blue'
-        ax1.set_xlabel('Episode')
-        ax1.set_ylabel('Average Reward', color=color)
-        ax1.plot(log_reward, color=color)
-        ax1.tick_params(axis='y', labelcolor=color)
-
-        ax2 = ax1.twinx()
-        color = 'tab:orange'
-        ax2.set_ylabel('Time Steps', color=color)
-        ax2.plot(log_timesteps, color=color)
-        ax2.tick_params(axis='y', labelcolor=color)
-
-        plt.title(f"Training {env_name}")
-        plt.savefig(
-            f"{file_path}{env_name}_{detection_algorithm}_training_reward.png")
-        plt.show()
-
-        _, ax1 = plt.subplots()
-        multiplier = int(HyperParams.UPDATE_TIMESTEP.value/HyperParams.MAX_TIMESTEPS.value)
-        color = 'tab:green'
-        ax1.set_xlabel('Epoch')
-        ax1.set_ylabel('Loss', color=color)
-        ax1.plot([int(i * multiplier) for i in range(len(log_loss))], log_loss, color=color)
-        ax1.tick_params(axis='y', labelcolor=color)
-
-        plt.title(f"Training {env_name}")
-        plt.savefig(
-            f"{file_path}{env_name}_{detection_algorithm}_training_loss.png")
-        plt.show()
     
     @staticmethod
     def plot_training(
         log: dict, 
         env_name: str, 
         detection_algorithm: str,
-        file_path: str = FilePaths.TEST_DIR.value):
+        file_path: str):
         """Plot the training results
 
         Parameters
@@ -222,10 +211,9 @@ class Utils:
             Name of the environment
         detection_algorithm : str
             Name of the detection algorithm
-        file_path : str, optional
-            Path to save the plot, by default FilePaths.LOG_DIR.value
+        file_path : str
+            Path to save the plot
         """
-        file_path = file_path + env_name + '/' + detection_algorithm
         # Plot the average reward and the time steps of the episodes in the same
         # plot, using matplotlib, where the average reward is the blue line and
         # the episode length are the orange line.
@@ -233,13 +221,19 @@ class Utils:
         color = 'tab:blue'
         ax1.set_xlabel('Episode')
         ax1.set_ylabel('Average Reward', color=color)
+        # ° Plot Lines
         ax1.plot(log["train_avg_reward"], color=color)
+        # ° Plot Points
+        # ax1.scatter(range(len(log["train_avg_reward"])), log["train_avg_reward"], color=color)
         ax1.tick_params(axis='y', labelcolor=color)
 
         ax2 = ax1.twinx()
         color = 'tab:orange'
         ax2.set_ylabel('Time Steps', color=color)
+        # ° Plot Lines
         ax2.plot(log["train_steps"], color=color)
+        # ° Plot Points
+        # ax2.scatter(range(len(log["train_steps"])), log["train_steps"], color=color)
         ax2.tick_params(axis='y', labelcolor=color)
 
         plt.title(f"Training on {env_name} graph with {detection_algorithm} algorithm")
@@ -253,55 +247,45 @@ class Utils:
         color = 'tab:green'
         ax1.set_xlabel('Episode')
         ax1.set_ylabel('Actor Loss', color=color)
+        # ° Plot Lines
         ax1.plot(log["a_loss"], color=color)
+        # ° Plot Points
+        # ax1.scatter(range(len(log["a_loss"])), log["a_loss"], color=color)
         ax1.tick_params(axis='y', labelcolor=color)
 
         ax2 = ax1.twinx()
         color = 'tab:red'
         ax2.set_ylabel('Critic Loss', color=color)
+        # ° Plot Lines
         ax2.plot(log["v_loss"], color=color)
+        # ° Plot Points
+        # ax2.scatter(range(len(log["v_loss"])), log["v_loss"], color=color)
         ax2.tick_params(axis='y', labelcolor=color)
 
         plt.title(f"Training on {env_name} graph with {detection_algorithm} algorithm")
         plt.savefig(
             f"{file_path}/{env_name}_{detection_algorithm}_training_loss.png")
         plt.show()
-
+    
     @staticmethod
-    def write_results_to_json(
-            log_reward: List[float],
-            log_length: List[int],
-            log_loss: List[float],
-            hyperparameters: dict,
+    def save_training(
+            log: dict,
             env_name: str,
             detection_algorithm: str,
-            file_path: str = FilePaths.TEST_DIR.value):
-        """
-        Write the episodes_avg_reward, episode_length, and hyperparameters to a JSON file.
+            file_path: str):
+        """Plot the training results
 
         Parameters
         ----------
-        log_reward : List[float]
-            List of average rewards for each episode
-        log_length : List[int]
-            List of episode lengths
-        log_loss : List[float]
-            List of losses for each episode
-        hyperparameters : dict
-            Dictionary of hyperparameters used in the training process
+        log : dict
+            Dictionary containing the training logs
         env_name : str
-            Environment name
+            Name of the environment
         detection_algorithm : str
-            Detection algorithm used
+            Name of the detection algorithm
         file_path : str
-            Path to the output JSON file
+            Path to save the plot
         """
-        data = {
-            "episodes_avg_reward": log_reward,
-            "episode_avg_length": log_length,
-            "episode_avg_loss": log_loss,
-            "hyperparameters": hyperparameters
-        }
-        file_name = f"{file_path}{env_name}_{detection_algorithm}_results.json"
-        with open(file_name, "w") as f:
-            json.dump(data, f, indent=4)
+        file_name = f"{file_path}/{env_name}_{detection_algorithm}_results.json"
+        with open(file_name, "w", encoding="utf-8") as f:
+            json.dump(log, f, indent=4)

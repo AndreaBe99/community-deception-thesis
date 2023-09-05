@@ -179,6 +179,11 @@ class Utils:
             seed=seed)
         file_path = FilePaths.DATASETS_DIR.value + f"/lfr_benchmark_mu-{mu}.mtx"
         nx.write_edgelist(graph, file_path, data=False)
+        # Delete community attribute from the nodes to handle PyG compatibility
+        for node in graph.nodes:
+            del graph.nodes[node]['community']
+        for edge in graph.edges:
+            graph.edges[edge]['weight'] = 1
         return graph, file_path
         
     @staticmethod

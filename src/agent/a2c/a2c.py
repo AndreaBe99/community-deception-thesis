@@ -61,6 +61,8 @@ class ActorCritic(nn.Module):
         """
         # Actor
         probs = self.actor(state)
+        # Adds jitter to ensure numerical stability
+        # Use softplus to ensure concentration is positive
         concentration = F.softplus(probs).reshape(-1) + jitter
         # Critic
         value = self.critic(state)

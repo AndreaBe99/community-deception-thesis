@@ -12,16 +12,6 @@ To install requirements:
 pip install -r requirements.txt
 ```
 
-Install graph-tool for your system. For example, for Ubuntu:
-
-```bash
-apt-get install python3-graph-tool
-```
-
-Instructions for other systems can be found [here](https://git.skewed.de/count0/graph-tool/-/wikis/installation-instructions).
-
-To install **Deep Graph Library** (`dgl`) for your system, follow the instructions [here](<https://www.dgl.ai/pages/start.html>).
-
 ## Training
 
 To train the model, run the following command:

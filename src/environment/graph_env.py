@@ -68,12 +68,16 @@ class GraphEnvironment(object):
         self.beta = beta
         self.weight = weight
         self.env_name = env_name
+        self.detection_alg = community_detection_algorithm
         
         # Community Algorithms objects
         self.detection = CommunityDetectionAlgorithm(community_detection_algorithm)
-        self.deception = DeceptionScore(self.community_target)
+        
+        # Metrics
+        # self.deception = DeceptionScore(self.community_target)
         # self.safeness = Safeness(self.graph, self.community_target, self.node_target)
         self.nmi = NormalizedMutualInformation()
+        
         # Compute the community structure of the graph, before the action,
         # i.e. before the deception
         self.community_structure_start = self.detection.compute_community(graph)
@@ -224,10 +228,11 @@ class GraphEnvironment(object):
         # Return a PyG Data object
         self.data_pyg = from_networkx(self.graph)
         # Initialize the node features
-        self.data_pyg.x = torch.randn([self.data_pyg.num_nodes, HyperParams.G_IN_SIZE.value])
+        self.data_pyg.x = torch.randn(
+            [self.data_pyg.num_nodes, HyperParams.STATE_DIM.value])
         # Initialize the batch
         self.data_pyg.batch = torch.zeros(self.data_pyg.num_nodes).long()
-        return self.data_pyg.to(self.device)
+        return self.data_pyg
     
     def step(self, action: int) -> Tuple[Data, float]:
         """
@@ -252,7 +257,7 @@ class GraphEnvironment(object):
         if budget_consumed == 0:
             self.rewards = -2
             # The state is the same as before
-            return self.data_pyg.to(self.device), self.rewards, self.stop_episode
+            return self.data_pyg, self.rewards, self.stop_episode
         
         # ° ---- METRICS ---- ° #
         # Compute the new Community Structure after the action
@@ -323,7 +328,7 @@ class GraphEnvironment(object):
         # TEST data.batch = self.data_pyg.batch
         # Update the old graph pyg data object
         # TEST self.data_pyg = data
-        return self.data_pyg.to(self.device), self.rewards, self.stop_episode
+        return self.data_pyg, self.rewards, self.stop_episode
     
     def get_possible_actions(self) -> dict:
         """

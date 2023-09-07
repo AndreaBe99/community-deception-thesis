@@ -3,11 +3,10 @@ from enum import Enum
 from typing import List, Tuple
 import matplotlib.pyplot as plt
 import networkx as nx
+import numpy as np
 import scipy
 import json
 import os
-
-"""Module to store utility functions and constants"""
 
 
 class FilePaths(Enum):
@@ -18,10 +17,12 @@ class FilePaths(Enum):
     TEST_DIR = 'test/'
     # ° Kaggle
     # DATASETS_DIR = '/kaggle/input/network-community'
-    # LOG_DIR    = 'logs/'
+    # LOG_DIR = '/kaggle/working/logs/'
+    # TEST_DIR = '/kaggle/working/test/'
     # ° Google Colab
     # DATASETS_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Datasets"
     # LOG_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Logs/"
+    # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/
     
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'
@@ -41,45 +42,70 @@ class FilePaths(Enum):
 
 
 class HyperParams(Enum):
-    """ Hyperparameters for the model."""
-
+    """Hyperparameters for the Environment"""
+    # Numeber of possible action with BETA=30, is 30% of the edges
+    BETA = 10  
+    # Weight to balance the reward
+    WEIGHT = 0.1  # 0.001, 0.01, 0.1, 1, 10
+    
     """ Graph Encoder Parameters """""
-    G_IN_SIZE = 64
-    G_HIDDEN_SIZE_1 = 128
-    G_HIDDEN_SIZE_2 = 64
-    G_EMBEDDING_SIZE = 32
+    STATE_DIM = 64
+    # G_HIDDEN_SIZE_1 = 128
+    # G_HIDDEN_SIZE_2 = 64
+    # G_EMBEDDING_SIZE = 32
 
     """ Agent Parameters"""
-    HIDDEN_SIZE_1 = 64
-    HIDDEN_SIZE_2 = 128
-    ACTION_STD = 0.5
-    EPS_CLIP = 0.2
-    LR = 1e-3
-    GAMMA = 0.99
+    HIDDEN_SIZE_1 = 32
+    HIDDEN_SIZE_2 = 32
+    ACTION_DIM = 1      # We will return a  N*1 vector of actions, where N is the number of nodes
+    # ACTION_STD = 0.5
+    EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
+    LR = 0.0001
+    GAMMA = 0.5 # 0.97
+    BEST_REWARD = 0.7  # -np.inf
 
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 1000 # 200 # 15000
-    # Maximum number of time steps per episode
-    MAX_TIMESTEPS = 10  # ! Unused, I set it to the double of the edge budget
-    # Update the policy after N timesteps
-    UPDATE_TIMESTEP = 100  # ! Unused, I set it to 10 times the edge budget
-    # Update policy for K epochs
-    K_EPOCHS = 20
-    # Print info about the model after N episodes
-    LOG_INTERVAL = 20
-    # Exit if the average reward is greater than this value
-    SOLVED_REWARD = 0.7
-    # Save model after N episodes
-    SAVE_MODEL = int(MAX_EPISODES / 10)
-    # Use a random seed
-    RANDOM_SEED = 42
+    MAX_EPISODES = 1000  # 200 # 15000
+    # Dictonary for logging
+    LOG_DICT = {
+        'train_reward': [],
+        # Number of steps per episode
+        'train_steps': [],
+        # Average reward per step
+        'train_avg_reward': [],
+        # Average Actor loss per episode
+        'a_loss': [],
+        # Average Critic loss per episode
+        'v_loss': [],
+        # set max number of training episodes
+        'train_episodes': MAX_EPISODES,
+    }
+    
+    """Graph Generation Parameters"""
+    N_NODE = 10000
+    TAU1 = 3
+    TAU2 = 1.5
+    MU = 0.1             # TODO: Test also 0.3 and 0.6
+    AVERAGE_DEGREE = 5
+    MIN_COMMUNITY = 20
+    SEED= 10
 
-    """Hyperparameters for the Environment"""
-    BETA = 10  # Numeber of possible action with BETA=30, is 30% of the edges
-    DEBUG = False
-    # Weight to balance the reward between NMI and Deception Score
-    WEIGHT = 0.7
+    """Old Training Parameters"""
+    # Maximum number of time steps per episode
+    # MAX_TIMESTEPS = 10  # ! Unused, I set it to the double of the edge budget
+    # Update the policy after N timesteps
+    # UPDATE_TIMESTEP = 100  # ! Unused, I set it to 10 times the edge budget
+    # Update policy for K epochs
+    # K_EPOCHS = 20
+    # Print info about the model after N episodes
+    # LOG_INTERVAL = 20
+    # Exit if the average reward is greater than this value
+    # SOLVED_REWARD = 0.7
+    # Save model after N episodes
+    # SAVE_MODEL = int(MAX_EPISODES / 10)
+    # Use a random seed
+    # RANDOM_SEED = 42
 
 
 class DetectionAlgorithms(Enum):
@@ -100,11 +126,6 @@ class DetectionAlgorithms(Enum):
 
 class Utils:
     """Class to store utility functions"""
-
-    @staticmethod
-    def get_device_placement():
-        """Get device placement, CPU or GPU"""
-        return os.getenv("RELNET_DEVICE_PLACEMENT", "CPU")
 
     @staticmethod
     def import_mtx_graph(file_path: str) -> nx.Graph:
@@ -135,13 +156,13 @@ class Utils:
     
     @staticmethod
     def generate_lfr_benchmark_graph(
-        n: int=10000,
-        tau1: float=3,
-        tau2: float=1.5,
-        mu: float=0.1,              # TODO: Test also 0.3 and 0.6
-        average_degree: float=5, 
-        min_community: int=20, 
-        seed: int=10)->Tuple[nx.Graph, str]:
+        n: int=HyperParams.N_NODE.value,
+        tau1: float=HyperParams.TAU1.value,
+        tau2: float=HyperParams.TAU2.value,
+        mu: float=HyperParams.MU.value,              
+        average_degree: float=HyperParams.AVERAGE_DEGREE.value, 
+        min_community: int=HyperParams.MIN_COMMUNITY.value, 
+        seed: int=HyperParams.SEED.value)->Tuple[nx.Graph, str]:
         """
         Generate a LFR benchmark graph for community detection algorithms.
 
@@ -181,7 +202,8 @@ class Utils:
         nx.write_edgelist(graph, file_path, data=False)
         # Delete community attribute from the nodes to handle PyG compatibility
         for node in graph.nodes:
-            del graph.nodes[node]['community']
+            if 'community' in graph.nodes[node]:
+                del graph.nodes[node]['community']
         for edge in graph.edges:
             graph.edges[edge]['weight'] = 1
         return graph, file_path
@@ -199,13 +221,13 @@ class Utils:
         if not os.path.exists(path):
             os.makedirs(path)
     
-    
     @staticmethod
     def plot_training(
         log: dict, 
         env_name: str, 
         detection_algorithm: str,
-        file_path: str):
+        file_path: str,
+        window_size: int=100):
         """Plot the training results
 
         Parameters
@@ -218,59 +240,94 @@ class Utils:
             Name of the detection algorithm
         file_path : str
             Path to save the plot
+        window_size : int, optional
+            Size of the rolling window, by default 100
         """
-        # Plot the average reward and the time steps of the episodes in the same
-        # plot, using matplotlib, where the average reward is the blue line and
-        # the episode length are the orange line.
-        _, ax1 = plt.subplots()
-        color = 'tab:blue'
-        ax1.set_xlabel('Episode')
-        ax1.set_ylabel('Average Reward', color=color)
-        # ° Plot Lines
-        ax1.plot(log["train_avg_reward"], color=color)
-        # ° Plot Points
-        # ax1.scatter(range(len(log["train_avg_reward"])), log["train_avg_reward"], color=color)
-        ax1.tick_params(axis='y', labelcolor=color)
+        def plot_time_series(
+            list_1: List[float],
+            list_2: List[float],
+            label_1: str,
+            label_2: str,
+            color_1: str,
+            color_2: str,
+            file_name: str):
+            _, ax1 = plt.subplots()
+            color = 'tab:'+color_1
+            ax1.set_xlabel("Episode")
+            ax1.set_ylabel(label_1, color=color)
+            ax1.plot(list_1, color=color)
+            ax1.tick_params(axis='y', labelcolor=color)
 
-        ax2 = ax1.twinx()
-        color = 'tab:orange'
-        ax2.set_ylabel('Time Steps', color=color)
-        # ° Plot Lines
-        ax2.plot(log["train_steps"], color=color)
-        # ° Plot Points
-        # ax2.scatter(range(len(log["train_steps"])), log["train_steps"], color=color)
-        ax2.tick_params(axis='y', labelcolor=color)
+            ax2 = ax1.twinx()
+            color = 'tab:'+color_2
+            ax2.set_ylabel(label_2, color=color)
+            ax2.plot(list_2, color=color)
+            ax2.tick_params(axis='y', labelcolor=color)
 
-        plt.title(f"Training on {env_name} graph with {detection_algorithm} algorithm")
-        plt.savefig(
-            f"{file_path}/{env_name}_{detection_algorithm}_training_reward.png")
-        plt.show()
+            plt.title(
+                f"Training on {env_name} graph with {detection_algorithm} algorithm")
+            plt.savefig(file_name)
+            plt.show()
         
-        # Plot the Actor and Critic loss in the same plot, using matplotlib
-        # with the Actor loss in green and the Critic loss in red.
-        _, ax1 = plt.subplots()
-        color = 'tab:green'
-        ax1.set_xlabel('Episode')
-        ax1.set_ylabel('Actor Loss', color=color)
-        # ° Plot Lines
-        ax1.plot(log["a_loss"], color=color)
-        # ° Plot Points
-        # ax1.scatter(range(len(log["a_loss"])), log["a_loss"], color=color)
-        ax1.tick_params(axis='y', labelcolor=color)
+        def plot_rolling_window(
+            list_1: List[float],
+            list_2: List[float],
+            label_1: str,
+            label_2: str,
+            file_name: str,
+            window_size: int = 100):
+            time_series_1 = np.array(list_1)
+            time_series_2 = np.array(list_2)
+            # Compute the rolling windows of the time series data using NumPy
+            rolling_data_1 = np.convolve(time_series_1, np.ones(
+                window_size) / window_size, mode='valid')
+            rolling_data_2 = np.convolve(time_series_2, np.ones(
+                window_size) / window_size, mode='valid')
+            # Plot the rolling windows of the time series data using matplotlib
+            plt.plot(rolling_data_1, label=label_1)
+            plt.plot(rolling_data_2, label=label_2)
+            plt.title("Rolling Window")
+            plt.xlabel("Epochs")
+            # plt.ylabel("Epochs")
+            plt.legend()
+            plt.savefig(file_name)
+            plt.show()
+        
+        file_path = file_path+"/"+env_name+"_"+detection_algorithm
+        plot_time_series(
+            log['train_avg_reward'],
+            log['train_steps'],
+            'Avg Reward',
+            'Steps per Epoch',
+            'blue',
+            'orange',
+            file_path+"_training_reward.png",
+        )
+        plot_time_series(
+            log["a_loss"],
+            log["v_loss"],
+            'Actor Loss',
+            'Critic Loss',
+            'green',
+            'red',
+            file_path+"_training_loss.png",
+        )
 
-        ax2 = ax1.twinx()
-        color = 'tab:red'
-        ax2.set_ylabel('Critic Loss', color=color)
-        # ° Plot Lines
-        ax2.plot(log["v_loss"], color=color)
-        # ° Plot Points
-        # ax2.scatter(range(len(log["v_loss"])), log["v_loss"], color=color)
-        ax2.tick_params(axis='y', labelcolor=color)
-
-        plt.title(f"Training on {env_name} graph with {detection_algorithm} algorithm")
-        plt.savefig(
-            f"{file_path}/{env_name}_{detection_algorithm}_training_loss.png")
-        plt.show()
+        # Same plot with rolling window
+        plot_rolling_window(
+            log['train_reward'], 
+            log['train_steps'], 
+            'Avg Reward', 
+            'Steps per Epoch',
+            file_path+"_rolling_training_reward.png"
+        )
+        plot_rolling_window(
+            log["a_loss"],
+            log["v_loss"],
+            'Actor Loss',
+            'Critic Loss',
+            file_path+"_rolling_training_loss.png"
+        )
     
     @staticmethod
     def save_training(

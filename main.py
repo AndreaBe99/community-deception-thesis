@@ -1,5 +1,5 @@
 from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
-from src.community_algs.detection_algs import DetectionAlgorithm
+from src.community_algs.detection_algs import DetectionAlgorithm, CommunityDetectionAlgorithm
 from src.environment.graph_env import GraphEnvironment
 from src.agent.a2c.memory import Memory
 from src.agent.agent import Agent
@@ -12,13 +12,14 @@ if __name__ == "__main__":
     # ° ------ Graph Setup ------ ° #
     # ! REAL GRAPH Graph path (change the following line to change the graph)
     graph_path = FilePaths.KAR.value
+    # Load the graph from the dataset folder
+    graph = Utils.import_mtx_graph(graph_path)
     # ! SYNTHETIC GRAPH Graph path (change the following line to change the graph)
     # graph, graph_path = Utils.generate_lfr_benchmark_graph()
     
     # Set the environment name as the graph name
     env_name = graph_path.split("/")[-1].split(".")[0]
-    # Load the graph from the dataset folder
-    graph = Utils.import_mtx_graph(graph_path)
+    
     # Print the number of nodes and edges
     print("* Graph Name:", env_name)
     print("*", graph)
@@ -28,43 +29,38 @@ if __name__ == "__main__":
     detection_alg = DetectionAlgorithms.WALK.value
     print("* Community Detection Algorithm:", detection_alg)
     # Apply the community detection algorithm on the graph
-    dct = DetectionAlgorithm(detection_alg)
+    dct = CommunityDetectionAlgorithm(detection_alg)
     community_structure = dct.compute_community(graph)
+    print("* Number of communities found:", len(community_structure.communities))
+
     # Choose one of the communities found by the algorithm, for now we choose 
     # the community with the highest number of nodes
-    community_target = max(community_structure, key=len)
-    print("* Community Target:", community_target)
+    community_target = max(community_structure.communities, key=len)
+    idx_community = community_structure.communities.index(community_target)
+    print("* Community Target:\t", community_target)
+    print("* Index Community:\t", idx_community)
     # TEST: Choose a node to remove from the community
-    nodes_target = [community_target[0]]
-    print("* Nodes Target:", nodes_target)
+    node_target = community_target[random.randint(0, len(community_target)-1)]
+    print("* Nodes Target:\t\t", node_target)
     
     # Define the environment
     env = GraphEnvironment(
         graph=graph,
         community=community_target,
-        nodes_target=nodes_target,
-        beta=HyperParams.BETA.value, # % of actions to perform
-        weight=HyperParams.WEIGHT.value, # weight to balance the reward
-        debug=False, 
-        training=True,
+        idx_community=idx_community,
+        node_target=node_target,
         env_name=env_name,
         community_detection_algorithm=detection_alg)
     # Get list of possible actions which can be performed on the graph by the agent
     n_actions = len(env.possible_actions["ADD"]) + \
         len(env.possible_actions["REMOVE"])
     print("* Number of possible actions:", n_actions)
+    print("* Rewiring Budget:", env.edge_budget)
 
     # ° ------ Agent Setup ------ ° #
     # Define the agent
-    agent = Agent(
-        state_dim=HyperParams.G_IN_SIZE.value,      # Dimensions of the state
-        action_dim=graph.number_of_nodes(),         # Number of possible actions
-        action_std=HyperParams.ACTION_STD.value,    # Standard deviation for the action
-        lr=HyperParams.LR.value,                    # Learning rate
-        gamma=HyperParams.GAMMA.value,              # Gamma parameter
-        eps=HyperParams.EPS_CLIP.value,)            # Value for clipping the loss function
-    # Define Memory
-    # memory = Memory()
+    agent = Agent()
+    # Print Hyperparameters of the Agent (inner method)
     print("*", "-"*53)
     print("*"*20, "End Information", "*"*20, "\n")
     

@@ -15,67 +15,184 @@ import torch
 
 from tqdm import trange
 import numpy as np
+import random
 import os
 
 
 class Agent:
-    def __init__(self, state_dim, action_dim, action_std, lr, gamma, eps):
+    def __init__(
+        self, 
+        state_dim: int = HyperParams.STATE_DIM.value, 
+        hidden_size_1: int = HyperParams.HIDDEN_SIZE_1.value, 
+        hidden_size_2: int = HyperParams.HIDDEN_SIZE_2.value,
+        action_dim: int = HyperParams.ACTION_DIM.value,
+        lr: float = HyperParams.LR.value,
+        gamma: float = HyperParams.GAMMA.value,
+        eps: float = HyperParams.EPS_CLIP.value,
+        best_reward: float = HyperParams.BEST_REWARD.value):
+        """
+        Initialize the agent.
+
+        Parameters
+        ----------
+        state_dim : int
+            Dimensions of the state, i.e. length of the feature vector
+        hidden_size_1 : int
+            First A2C hidden layer size
+        hidden_size_2 : int
+            Second A2C hidden layer size
+        action_dim : int
+            Dimensions of the action (it is set to 1, to return a tensor N*1)
+        lr : float
+            Learning rate
+        gamma : float
+            Discount factor
+        eps : float
+            Value for clipping the loss function
+        best_reward : float, optional
+            Best reward, by default 0.8
+        """
         self.state_dim = state_dim
+        self.hidden_size_1 = hidden_size_1
+        self.hidden_size_2 = hidden_size_2
         self.action_dim = action_dim
-        self.action_std = action_std
+        self.policy = ActorCritic(
+            state_dim, hidden_size_1, hidden_size_2, action_dim)
+        
+        # Hyperparameters
         self.lr = lr
-        # self.betas = betas
         self.gamma = gamma
         self.eps = eps
-
-        self.device = torch.device(
-            'cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.best_reward = best_reward
+        # Print Hyperparameters on console
+        self.print_hyperparams()
         
-        self.policy = ActorCritic(
-            state_dim, action_dim, action_std).to(self.device)
+        # Set device
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.policy.to(self.device)
+        # Set optimizers
         self.optimizers = self.configure_optimizers()
         
+        # Initialize lists for logging, it contains: avg_reward, avg_steps per episode
+        self.log_dict = HyperParams.LOG_DICT.value
+        
+        # Training variables
+        self.obs = None 
+        self.episode_reward = 0
+        self.done = False
+        self.step = 0
         # action & reward buffer
-        # self.memory = Memory()
         self.SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
         self.saved_actions = []
         self.rewards = []
         
-        # Initialize lists for logging
-        self.log_dict = {
-            'train_reward': [],
-            # Number of steps per episode
-            'train_steps': [],
-            # Average reward per step
-            'train_avg_reward': [],
-            # Average Actor loss per episode
-            'a_loss': [],
-            # Average Critic loss per episode
-            'v_loss': [],
-            # set max number of training episodes
-            'train_episodes': HyperParams.MAX_EPISODES.value,
-        }
-        
-        # Print Hyperparameters on console
-        self.print_hyperparams()
-        
     def configure_optimizers(self):
-        """Configure optimizers
+        """
+        Configure optimizers
         
         Returns
         -------
         optimizers : dict
             Dictionary of optimizers
         """
-        optimizers = dict()
         actor_params = list(self.policy.actor.parameters())
         critic_params = list(self.policy.critic.parameters())
+        optimizers = dict()
         optimizers['a_optimizer'] = torch.optim.Adam(actor_params, lr=self.lr)
         optimizers['c_optimizer'] = torch.optim.Adam(critic_params, lr=self.lr)
         return optimizers
+    
+    def training(
+        self,
+        env: GraphEnvironment,
+        env_name: str,
+        detection_alg: str) -> dict:
+        """
+        Train the agent on the environment, change the target node every 10
+        episodes and the target community every 100 episodes. The episode ends
+        when the target node is isolated from the target community, or when the
+        maximum number of steps is reached.
 
-    def select_action(self, state: Data)->List[float]:
-        """Select action
+        Parameters
+        ----------
+        env : GraphEnvironment
+            Environment to train the agent on
+        agent : Agent
+            Agent to train
+        env_name : str
+            Name of the environment
+        detection_alg : str
+            Name of the detection algorithm
+        
+        Returns
+        -------
+        log_dict : dict
+            Dictionary containing the training logs
+        """
+        epochs = trange(self.log_dict['train_episodes'])  # epoch iterator
+        self.policy.train()  # set model in train mode
+        for i_episode in epochs:
+            # Change Target Node every 10 episodes
+            if i_episode % 10 == 0:
+                env.change_target_node()
+            # Change Target Community every 100 episodes
+            if i_episode % 100 == 0:
+                env.change_target_community()
+            
+            # Rewiring the graph until the target node is isolated from the 
+            # target community
+            while not self.done:
+                self.rewiring(env)
+                
+            # perform on-policy backpropagation
+            self.a_loss, self.v_loss = self.training_step()
+            
+            # Send current statistics to screen
+            epochs.set_description(
+                f"Episode {i_episode+1} " +\
+                f"| Avg Reward: {self.episode_reward/self.step:.2f} " +\
+                f"| Avg Steps: {self.step} " +\
+                f"| Actor Loss: {self.a_loss:.2f} " +\
+                f"| Critic Loss: {self.v_loss:.2f}")
+
+            # Checkpoint best performing model
+            if self.episode_reward >= self.best_reward:
+                self.save_checkpoint(env_name, detection_alg)
+                self.best_reward = self.episode_reward
+            
+            # Log
+            self.log_dict['train_reward'].append(self.episode_reward)
+            self.log_dict['train_steps'].append(self.step)
+            self.log_dict['train_avg_reward'].append(
+                self.episode_reward/self.step)
+            self.log_dict['a_loss'].append(self.a_loss)
+            self.log_dict['v_loss'].append(self.v_loss)
+            self.log(self.log_dict, env_name, detection_alg)
+        return self.log_dict
+    
+    def rewiring(self, env: GraphEnvironment)->None:
+        """
+        Rewiring step, select action and take step in environment.
+
+        Parameters
+        ----------
+        env : GraphEnvironment
+            Graph environment
+        """
+        # Select action: return a list of the probabilities of each action
+        action_rl = self.select_action(self.obs)
+        torch.cuda.empty_cache()
+        # Take action in environment
+        self.obs, reward, self.done = env.step(action_rl)
+        # Update reward
+        self.episode_reward += reward
+        # Store the transition in memory
+        self.rewards.append(reward)
+        self.step += 1
+    
+    def select_action(self, state: Data) -> int:
+        """
+        Select action, given a state, using the policy network.
         
         Parameters
         ----------
@@ -84,34 +201,96 @@ class Agent:
         
         Returns
         -------
-        List[float]
-            List of action probabilities
+        action: int
+            Integer representing a node in the graph, it will be the destination
+            node of the rewiring action
         """
         concentration, value = self.policy.forward(state)
-        dist = torch.distributions.Dirichlet(concentration)
+        dist = torch.distributions.Categorical(concentration)
         action = dist.sample()
-        self.saved_actions.append(self.SavedAction(dist.log_prob(action), value))
-        return list(action.cpu().numpy())
+        self.saved_actions.append(
+            self.SavedAction(dist.log_prob(action), value))
+        return action.item()
     
+    def training_step(self) -> Tuple[float, float]:
+        """
+        Perform a single training step of the A2C algorithm, which involves
+        computing the actor and critic losses, taking gradient steps, and 
+        resetting the rewards and action buffer.
+        
+        Returns
+        -------
+        mean_a_loss : float
+            Mean actor loss
+        mean_v_loss : float
+            Mean critic loss
+        """
+        R = 0
+        saved_actions = self.saved_actions
+        policy_losses = []  # list to save actor (policy) loss
+        value_losses = []  # list to save critic (value) loss
+        returns = []  # list to save the true values
+
+        # calculate the true value using rewards returned from the environment
+        for r in self.rewards[::-1]:
+            # calculate the discounted value
+            R = r + self.gamma * R
+            # insert to the beginning of the list
+            returns.insert(0, R)
+
+        # Normalize returns by subtracting mean and dividing by standard deviation
+        # NOTE: May cause NaN problem
+        if len(returns) > 1:
+            returns = torch.tensor(returns)
+            returns = (returns - returns.mean()) / (returns.std() + self.eps)
+        else:
+            returns = torch.tensor(returns)
+
+        # Computing losses
+        for (log_prob, value), R in zip(saved_actions, returns):
+            # Difference between true value and estimated value from critic
+            advantage = R - value.item()
+            # calculate actor (policy) loss
+            policy_losses.append(-log_prob * advantage)
+            # calculate critic (value) loss using L1 smooth loss
+            value_losses.append(F.smooth_l1_loss(
+                value, torch.tensor([R]).to(self.device)))
+
+        # take gradient steps
+        self.optimizers['a_optimizer'].zero_grad()
+        a_loss = torch.stack(policy_losses).sum()
+        a_loss.backward()
+        self.optimizers['a_optimizer'].step()
+
+        self.optimizers['c_optimizer'].zero_grad()
+        v_loss = torch.stack(value_losses).sum()
+        v_loss.backward()
+        self.optimizers['c_optimizer'].step()
+
+        mean_a_loss = torch.stack(policy_losses).mean().item()
+        mean_v_loss = torch.stack(value_losses).mean().item()
+
+        # reset rewards and action buffer
+        del self.rewards[:]
+        del self.saved_actions[:]
+        return mean_a_loss, mean_v_loss
+
     def print_hyperparams(self):
         """Print hyperparameters"""
-        # Print Hyperparameters
         print("*", "-"*18, "Hyperparameters", "-"*18)
         print("* State dimension: ", self.state_dim)
         print("* Action dimension: ", self.action_dim)
-        print("* Action standard deviation: ", self.action_std)
         print("* Learning rate: ", self.lr)
         print("* Gamma parameter: ", self.gamma)
-        # print("* Number of epochs when updating the policy: ", k_epochs)
         print("* Value for clipping the loss function: ", self.eps)
 
     def save_checkpoint(
-        self,
-        env_name: str = 'default',
-        detection_alg: str = 'default',
-        log_dir: str = FilePaths.LOG_DIR.value):
+            self,
+            env_name: str = 'default',
+            detection_alg: str = 'default',
+            log_dir: str = FilePaths.LOG_DIR.value):
         """Save checkpoint"""
-        log_dir = log_dir + env_name# + '/' + detection_alg
+        log_dir = log_dir + env_name  # + '/' + detection_alg
         # Check if the directory exists, otherwise create it
         Utils.check_dir(log_dir)
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
@@ -137,7 +316,7 @@ class Agent:
         log_dir : str, optional
             Path to the log directory, by default FilePaths.LOG_DIR.value
         """
-        log_dir = log_dir + env_name# + '/' + detection_alg
+        log_dir = log_dir + env_name  # + '/' + detection_alg
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
         checkpoint = torch.load(path)
         self.policy.load_state_dict(checkpoint['model'])
@@ -145,11 +324,11 @@ class Agent:
             self.optimizers[key].load_state_dict(checkpoint[key])
 
     def log(
-        self, 
-        log_dict:dict, 
-        env_name: str = 'default',
-        detection_alg: str = 'default',
-        log_dir: str = FilePaths.LOG_DIR.value):
+            self,
+            log_dict: dict,
+            env_name: str = 'default',
+            detection_alg: str = 'default',
+            log_dir: str = FilePaths.LOG_DIR.value):
         """Log data
         
         Parameters
@@ -163,129 +342,6 @@ class Agent:
         log_dir : str, optional
             Path to the log directory, by default FilePaths.LOG_DIR.value
         """
-        log_dir = log_dir + env_name # + '/' + detection_alg
+        log_dir = log_dir + env_name  # + '/' + detection_alg
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
         torch.save(log_dict, path)
-    
-    def training_step(self)->Tuple[float, float]:
-        """
-        Perform a single training step of the A2C algorithm, which involves
-        computing the actor and critic losses, taking gradient steps, and 
-        resetting the rewards and action buffer.
-        
-        Returns
-        -------
-        mean_a_loss : float
-            Mean actor loss
-        mean_v_loss : float
-            Mean critic loss
-        """
-        R = 0
-        saved_actions = self.saved_actions
-        policy_losses = []  # list to save actor (policy) loss
-        value_losses = []  # list to save critic (value) loss
-        returns = []  # list to save the true values
-
-        # calculate the true value using rewards returned from the environment
-        for r in self.rewards[::-1]:
-            # calculate the discounted value
-            R = r + self.gamma * R
-            returns.insert(0, R)
-
-        # Normalize returns by subtracting mean and dividing by standard deviation
-        returns = torch.tensor(returns)
-        returns = (returns - returns.mean()) / (returns.std() + self.eps)
-
-        # Computing losses
-        for (log_prob, value), R in zip(saved_actions, returns):
-            # Difference between true value and estimated value from critic
-            advantage = R - value.item()
-            # calculate actor (policy) loss
-            policy_losses.append(-log_prob * advantage)
-            # calculate critic (value) loss using L1 smooth loss
-            value_losses.append(F.smooth_l1_loss(
-                value, torch.tensor([R]).to(self.device)))#.view(-1,1)))
-
-        # take gradient steps
-        self.optimizers['a_optimizer'].zero_grad()
-        a_loss = torch.stack(policy_losses).sum()
-        mean_a_loss = torch.stack(policy_losses).mean().item()
-        a_loss.backward()
-        self.optimizers['a_optimizer'].step()
-
-        self.optimizers['c_optimizer'].zero_grad()
-        v_loss = torch.stack(value_losses).sum()
-        mean_v_loss = torch.stack(value_losses).mean().item()
-        v_loss.backward()
-        self.optimizers['c_optimizer'].step()
-
-        # reset rewards and action buffer
-        del self.rewards[:]
-        del self.saved_actions[:]
-        return mean_a_loss, mean_v_loss
-    
-
-    def training(
-        self,
-        env: GraphEnvironment,
-        env_name: str,
-        detection_alg: str) -> dict:
-        """
-        Train the agent on the environment
-
-        Parameters
-        ----------
-        env : GraphEnvironment
-            Environment to train the agent on
-        agent : Agent
-            Agent to train
-        env_name : str
-            Name of the environment
-        detection_alg : str
-            Name of the detection algorithm
-        
-        Returns
-        -------
-        log_dict : dict
-            Dictionary containing the training logs
-        """
-        # T = HyperParams.MAX_TIMESTEPS.value  # set max number of timesteps per episode
-        # T = env.edge_budget*2
-        epochs = trange(self.log_dict['train_episodes'])  # epoch iterator
-        best_reward = -np.inf  # set best reward
-        self.policy.train()  # set model in train mode
-
-        for i_episode in epochs:
-            # print("*" * 20, "Start Episode", i_episode, "*" * 20)
-            obs = env.reset()  # initialize environment
-            episode_reward = 0
-            done = False
-            step = 0
-            while not done:
-                # Select action: return a list of the probabilities of each action
-                action_rl = self.select_action(obs)
-                # Take action in environment
-                obs, reward, done = env.step(action_rl)
-                # Update reward
-                episode_reward += reward
-                # Store the transition in memory
-                self.rewards.append(reward)
-                step += 1
-            # perform on-policy backpropagation
-            a_loss, v_loss = self.training_step()
-            # Send current statistics to screen
-            epochs.set_description(
-                f"Episode {i_episode+1} | Avg Reward: {episode_reward/step:.2f} | Avg Steps: {step} | Actor Loss: {a_loss:.2f} | Critic Loss: {v_loss:.2f}")
-            # print("*"*60, "\n")
-            # Checkpoint best performing model
-            if episode_reward >= best_reward:
-                self.save_checkpoint(env_name, detection_alg)
-                best_reward = episode_reward
-            # Log
-            self.log_dict['train_reward'].append(episode_reward)
-            self.log_dict['train_steps'].append(step)
-            self.log_dict['train_avg_reward'].append(episode_reward/step)
-            self.log_dict['a_loss'].append(a_loss)
-            self.log_dict['v_loss'].append(v_loss)
-            self.log(self.log_dict, env_name, detection_alg)
-        return self.log_dict

@@ -18,34 +18,25 @@ import torch
 class ActorCritic(nn.Module):
     """ActorCritic Network"""
 
-    def __init__(self, state_dim, action_dim, action_std):
+    def __init__(self, state_dim, hidden_size_1, hidden_size_2, action_dim):
         super(ActorCritic, self).__init__()
-        # action mean range -1 to 1
-        actor_cfg = {
-            # Encoder
-            'g_in_size': state_dim,
-            'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
-
-            # Actor
-            'hidden_size_1': HyperParams.HIDDEN_SIZE_1.value,
-            'hidden_size_2': HyperParams.HIDDEN_SIZE_2.value,
-            'nb_actions': action_dim,
-        }
-        critic_cfg = {
-            # Encoder
-            'g_in_size': state_dim,
-            'g_embedding_size': HyperParams.G_EMBEDDING_SIZE.value,
-
-            # Critic
-            'hidden_size_1': HyperParams.HIDDEN_SIZE_1.value,
-        }
-        self.actor = ActorNetwork(**actor_cfg)
-        self.critic = CriticNetwork(**critic_cfg)
+        self.actor = ActorNetwork(
+            state_dim=state_dim,
+            hidden_size_1=hidden_size_1,
+            hidden_size_2=hidden_size_2,
+            action_dim=action_dim
+        )
+        self.critic = CriticNetwork(
+            state_dim=state_dim,
+            hidden_size_1=hidden_size_1,
+            hidden_size_2=hidden_size_2
+        )
         self.device = torch.device(
-            'cuda:0' if torch.cuda.is_available() else 'cpu')
+            'cuda' if torch.cuda.is_available() else 'cpu')
 
     def forward(self, state: Data, jitter=1e-20) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass
+        """
+        Forward pass, computes action and value
         
         Parameters
         ----------
@@ -59,6 +50,7 @@ class ActorCritic(nn.Module):
         Tuple[torch.Tensor, torch.Tensor]
             Tuple of concentration and value
         """
+        state = state.to(self.device)
         # Actor
         probs = self.actor(state)
         # Adds jitter to ensure numerical stability

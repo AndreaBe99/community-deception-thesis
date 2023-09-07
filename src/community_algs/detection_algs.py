@@ -4,14 +4,72 @@
 from src.utils.utils import DetectionAlgorithms
 from typing import List
 
+from cdlib import algorithms
+import cdlib
+
 import os
 import networkx as nx
 import igraph as ig
 import matplotlib.pyplot as plt
 plt.style.use('default')
 
+
+class CommunityDetectionAlgorithm(object):
+    """Class for the community detection algorithms using CDLIB"""
+    def __init__(self, alg_name: str) -> None:
+        """
+        Initialize the DetectionAlgorithm object
+        
+        Parameters
+        ----------
+        alg_name : str
+            The name of the algorithm
+        """
+        self.alg_name = alg_name
+    
+    def compute_community(self, graph: nx.Graph) -> cdlib.NodeClustering:
+        """Compute the community partition of the graph
+
+        Parameters
+        ----------
+        graph : nx.Graph
+            Input graph
+
+        Returns
+        -------
+        cdlib.NodeClustering
+            Cdlib NodeClustering object
+        """
+        # Rename DetectionAlgorithms Enum to da for convenience
+        da = DetectionAlgorithms
+        # Choose the algorithm
+        if self.alg_name == da.LOUV.value:
+            return algorithms.louvain(graph)
+        elif self.alg_name == da.WALK.value:
+            return algorithms.walktrap(graph)
+        elif self.alg_name == da.GRE.value:
+            return algorithms.greedy_modularity(graph)
+        elif self.alg_name == da.INF.value:
+            return algorithms.infomap(graph)
+        # elif self.alg_name == da.LAB.value:
+        #    # ! Return a EdgeClustering object
+        #    return algorithms.label_propagation(graph)
+        elif self.alg_name == da.EIG.value:
+            return algorithms.eigenvector(graph)
+        # elif self.alg_name == da.BTW.value:
+        #     return self.compute_btw(graph, args)
+        elif self.alg_name == da.SPIN.value:
+            return algorithms.spinglass(graph)
+        # elif self.alg_name == da.OPT.value:
+        #    return self.compute_opt(graph, args)
+        # elif self.alg_name == da.SCD.value:
+        #    return self.compute_scd(graph)
+        else:
+            raise ValueError('Invalid algorithm name')
+    
+
 class DetectionAlgorithm(object):
-    """Class for the community detection algorithms"""
+    """Class for the community detection algorithms using iGraph"""
     
     def __init__(self, alg_name: str) -> None:
         """

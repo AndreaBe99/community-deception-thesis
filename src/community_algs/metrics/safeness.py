@@ -3,10 +3,10 @@ from typing import List, Set
 
 class Safeness:
     """Computes the safeness of a node in a community and the safeness of a community."""
-    def __init__(self, graph: nx.Graph, community_target: List[int], nodes_target: List[int]):
+    def __init__(self, graph: nx.Graph, community_target: List[int], node_target: int):
         self.graph = graph
         self.community_target = community_target
-        self.nodes_target = nodes_target
+        self.node_target = node_target
         # Get the set of nodes reachable from u passing only via nodes in C.
         print("* Compute Community Nodes Reachability...")
         # self.V_u_C = self.compute_reachability()
@@ -19,6 +19,53 @@ class Safeness:
         # Get the number of inter-community edges for u.
         print("* Compute Community Inter-Edges...")
         self.E_u_C_bar = self.get_inter_community_edges()
+    
+    def compute_community_safeness(self, community_target: List[int]) -> float:
+        """
+        Computes the community safeness of the community.
+        
+        Parameters
+        ----------
+        community_taget: List[int]
+            The community that we want to compute the safeness.
+
+        Returns
+        -------
+        float
+            The community safeness.
+        """
+        community_safeness = 0
+        for node in community_target:
+            community_safeness += self.compute_node_safeness(community_target, node)
+            # print(f"Node {node} safeness: {node_safeness}")
+        return community_safeness / len(community_target)
+    
+    def compute_node_safeness(self, community_target: List[int], node: int) -> float:
+        """
+        Computes the node safeness of the node in the community.
+        
+        Parameters
+        ----------
+        community_target: List[int]
+            The community of the node that we want to compute the safeness.
+        
+        node: int
+            The node that we want to compute the safeness.
+
+        Returns
+        -------
+        sigma_u_C: float
+            The node safeness.
+        """
+        # Get the degree of u.
+        deg_u = self.graph.degree(node)
+
+        # Compute the node safeness.
+        assert len(community_target) > 1, "The community must have at least 2 nodes."
+        assert deg_u > 0, "The node must have at least 1 edge."
+        sigma_u_C = 0.5*((self.V_u_C[node] - len(self.E_u_C)) /
+                         (len(community_target) - 1)) + 0.5*(len(self.E_u_C_bar) / deg_u)
+        return sigma_u_C
     
     # TEST, check if it si correct
     def num_nodes_in_same_component(self):
@@ -38,61 +85,13 @@ class Safeness:
         # Compute the connected components of the subgraph
         components = list(nx.connected_components(subgraph))
         # Find the component that contains node u
-        for u in self.nodes_target:
+        for u in self.community_target:
             V_u_C[u] = 0
             for component in components:
                 if u in component:
                     # Return the number of nodes in the component
                     V_u_C[u] = len(component)
         return V_u_C
-    
-    def compute_community_safeness(self, community: List[int]) -> float:
-        """
-        Computes the community safeness of the community.
-        
-        Parameters
-        ----------
-        community: List[int]
-            The community that we want to compute the safeness.
-
-        Returns
-        -------
-        float
-            The community safeness.
-        """
-        community_safeness = 0
-        for node in self.nodes_target:
-            node_safeness = self.compute_node_safeness(node)
-            community_safeness += node_safeness
-            # print(f"Node {node} safeness: {node_safeness}")
-        return community_safeness / len(community)
-        
-    def compute_node_safeness(self, node: int)->float:
-        """
-        Computes the node safeness of the node in the community.
-        
-        Parameters
-        ----------
-        community: List[int]
-            The community of the node that we want to compute the safeness.
-        
-        node: int
-            The node that we want to compute the safeness.
-
-        Returns
-        -------
-        sigma_u_C: float
-            The node safeness.
-        """
-        # Get the degree of u.
-        deg_u = self.graph.degree(node)
-
-        # Compute the node safeness.
-        assert len(self.community_target) > 1, "The community must have at least 2 nodes."
-        assert deg_u > 0, "The node must have at least 1 edge."
-        sigma_u_C = 0.5*((self.V_u_C[node] - len(self.E_u_C)) /
-                         (len(self.community_target) - 1)) + 0.5*(len(self.E_u_C_bar) / deg_u)
-        return sigma_u_C
 
     def get_intra_comminty_edges(self) -> List[int]:
         """

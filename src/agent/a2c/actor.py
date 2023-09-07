@@ -1,5 +1,5 @@
 """Module for the Actor Network"""
-from src.utils.utils import FilePaths
+from src.utils.utils import FilePaths, HyperParams
 from src.agent.a2c.graph_encoder import GraphEncoder
 from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv
@@ -14,42 +14,30 @@ class ActorNetwork(nn.Module):
     
     def __init__(
             self,
-            g_in_size,
-            g_embedding_size,
-            hidden_size_1,
-            hidden_size_2,
-            nb_actions,
-            chkpt_dir=FilePaths.LOG_DIR.value):
+            state_dim: int,
+            hidden_size_1: int,
+            hidden_size_2: int,
+            action_dim: int):
         super(ActorNetwork, self).__init__()
-
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_rl')
         
-        self.graph_encoder = GraphEncoder(g_in_size)
-        # self.linear1 = nn.Linear(g_embedding_size, hidden_size_1)
-        # self.linear2 = nn.Linear(hidden_size_1, hidden_size_2)
-        # self.linear3 = nn.Linear(hidden_size_2, nb_actions)
-        # TEST
-        self.gcnconv = GCNConv(g_in_size, g_in_size)
-        self.linear1 = nn.Linear(g_in_size, 32)
-        self.linear2 = nn.Linear(32, 32)
-        self.linear3 = nn.Linear(32, 1)
-
-        self.nb_actions = nb_actions
-        self.device = torch.device(
-            'cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.to(self.device)
+        self.graph_encoder = GraphEncoder(state_dim)
+        self.linear1 = nn.Linear(state_dim, hidden_size_1)
+        self.linear2 = nn.Linear(hidden_size_1, hidden_size_2)
+        self.linear3 = nn.Linear(hidden_size_2, action_dim)
+        
+        self.relu = nn.LeakyReLU()
+        # self.relu = nn.ReLU()
+        # self.tanh = nn.Tanh()
 
     def forward(self, state: Data):
-        # embedding = F.relu(self.gcnconv(state.x, state.edge_index))
-        # embedding = embedding + state.x
         embedding = self.graph_encoder(state)
-        actions = F.relu(self.linear1(embedding))
-        actions = F.relu(self.linear2(actions))
+        actions = self.relu(self.linear1(embedding))
+        actions = self.relu(self.linear2(actions))
         actions = self.linear3(actions)
         return actions
-
-    def save_checkpoint(self):
-        torch.save(self.state_dict(), self.checkpoint_file)
-
-    def load_checkpoint(self):
-        self.load_state_dict(torch.load(self.checkpoint_file))
+    
+    def is_nan(self, x, label):
+        """Debugging function to check if there are NaN values in the tensor"""
+        if torch.isnan(x).any():
+            print(label, ":", x)
+            raise ValueError(label, "is NaN")

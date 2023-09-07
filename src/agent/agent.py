@@ -22,6 +22,7 @@ import os
 class Agent:
     def __init__(
         self, 
+        env: GraphEnvironment,
         state_dim: int = HyperParams.STATE_DIM.value, 
         hidden_size_1: int = HyperParams.HIDDEN_SIZE_1.value, 
         hidden_size_2: int = HyperParams.HIDDEN_SIZE_2.value,
@@ -35,6 +36,8 @@ class Agent:
 
         Parameters
         ----------
+        env : GraphEnvironment
+            Environment to train the agent on
         state_dim : int
             Dimensions of the state, i.e. length of the feature vector
         hidden_size_1 : int
@@ -52,6 +55,7 @@ class Agent:
         best_reward : float, optional
             Best reward, by default 0.8
         """
+        self.env = env
         self.state_dim = state_dim
         self.hidden_size_1 = hidden_size_1
         self.hidden_size_2 = hidden_size_2
@@ -102,28 +106,13 @@ class Agent:
         optimizers['c_optimizer'] = torch.optim.Adam(critic_params, lr=self.lr)
         return optimizers
     
-    def training(
-        self,
-        env: GraphEnvironment,
-        env_name: str,
-        detection_alg: str) -> dict:
+    def training(self) -> dict:
         """
         Train the agent on the environment, change the target node every 10
         episodes and the target community every 100 episodes. The episode ends
         when the target node is isolated from the target community, or when the
         maximum number of steps is reached.
 
-        Parameters
-        ----------
-        env : GraphEnvironment
-            Environment to train the agent on
-        agent : Agent
-            Agent to train
-        env_name : str
-            Name of the environment
-        detection_alg : str
-            Name of the detection algorithm
-        
         Returns
         -------
         log_dict : dict
@@ -133,16 +122,21 @@ class Agent:
         self.policy.train()  # set model in train mode
         for i_episode in epochs:
             # Change Target Node every 10 episodes
-            if i_episode % 10 == 0:
-                env.change_target_node()
+            if i_episode % 10 == 0 and i_episode != 0:
+                self.env.change_target_node()
             # Change Target Community every 100 episodes
-            if i_episode % 100 == 0:
-                env.change_target_community()
+            if i_episode % 100 == 0 and i_episode != 0:
+                self.env.change_target_community()
+            
+            self.obs = self.env.reset()
+            self.episode_reward = 0
+            self.done = False
+            self.step = 0
             
             # Rewiring the graph until the target node is isolated from the 
             # target community
             while not self.done:
-                self.rewiring(env)
+                self.rewiring()
                 
             # perform on-policy backpropagation
             self.a_loss, self.v_loss = self.training_step()
@@ -157,7 +151,8 @@ class Agent:
 
             # Checkpoint best performing model
             if self.episode_reward >= self.best_reward:
-                self.save_checkpoint(env_name, detection_alg)
+                self.save_checkpoint(
+                    self.env.env_name, self.env.detection_alg)
                 self.best_reward = self.episode_reward
             
             # Log
@@ -167,23 +162,17 @@ class Agent:
                 self.episode_reward/self.step)
             self.log_dict['a_loss'].append(self.a_loss)
             self.log_dict['v_loss'].append(self.v_loss)
-            self.log(self.log_dict, env_name, detection_alg)
+            self.log(self.log_dict, self.env.env_name,
+                     self.env.detection_alg)
         return self.log_dict
     
-    def rewiring(self, env: GraphEnvironment)->None:
-        """
-        Rewiring step, select action and take step in environment.
-
-        Parameters
-        ----------
-        env : GraphEnvironment
-            Graph environment
-        """
+    def rewiring(self)->None:
+        """Rewiring step, select action and take step in environment."""
         # Select action: return a list of the probabilities of each action
         action_rl = self.select_action(self.obs)
         torch.cuda.empty_cache()
         # Take action in environment
-        self.obs, reward, self.done = env.step(action_rl)
+        self.obs, reward, self.done = self.env.step(action_rl)
         # Update reward
         self.episode_reward += reward
         # Store the transition in memory
@@ -277,9 +266,14 @@ class Agent:
 
     def print_hyperparams(self):
         """Print hyperparameters"""
-        print("*", "-"*18, "Hyperparameters", "-"*18)
+        print("*", "-"*18, " Model Architecture ", "-"*18)
         print("* State dimension: ", self.state_dim)
-        print("* Action dimension: ", self.action_dim)
+        print("* Hidden layer 1 size: ", self.hidden_size_1)
+        print("* Hidden layer 2 size: ", self.hidden_size_2)
+        print("* Action dimension: ", self.action_dim, "*", 
+            self.env.graph.number_of_nodes(),
+            "=", self.action_dim*self.env.graph.number_of_nodes())
+        print("*", "-"*18, "Model Hyperparameters", "-"*18)
         print("* Learning rate: ", self.lr)
         print("* Gamma parameter: ", self.gamma)
         print("* Value for clipping the loss function: ", self.eps)
@@ -343,5 +337,6 @@ class Agent:
             Path to the log directory, by default FilePaths.LOG_DIR.value
         """
         log_dir = log_dir + env_name  # + '/' + detection_alg
+        Utils.check_dir(log_dir)
         path = f'{log_dir}/{env_name}_{detection_alg}.pth'
         torch.save(log_dict, path)

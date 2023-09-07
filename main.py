@@ -37,11 +37,11 @@ if __name__ == "__main__":
     # the community with the highest number of nodes
     community_target = max(community_structure.communities, key=len)
     idx_community = community_structure.communities.index(community_target)
-    print("* Community Target:\t", community_target)
-    print("* Index Community:\t", idx_community)
+    print("* Initial Community Target:", community_target)
+    print("* Initial Index of the Community Target:", idx_community)
     # TEST: Choose a node to remove from the community
     node_target = community_target[random.randint(0, len(community_target)-1)]
-    print("* Nodes Target:\t\t", node_target)
+    print("* Initial Nodes Target:", node_target)
     
     # Define the environment
     env = GraphEnvironment(
@@ -55,16 +55,17 @@ if __name__ == "__main__":
     n_actions = len(env.possible_actions["ADD"]) + \
         len(env.possible_actions["REMOVE"])
     print("* Number of possible actions:", n_actions)
-    print("* Rewiring Budget:", env.edge_budget)
+    print("* Rewiring Budget:", env.edge_budget, "=", 
+        HyperParams.BETA.value, "*", env.graph.number_of_edges(), "/ 100",)
 
     # ° ------ Agent Setup ------ ° #
     # Define the agent
-    agent = Agent()
+    agent = Agent(env=env)
     # Print Hyperparameters of the Agent (inner method)
     print("*", "-"*53)
     print("*"*20, "End Information", "*"*20, "\n")
     
-    log = agent.training(env, env_name, detection_alg)
+    log = agent.training()
     file_path = FilePaths.TEST_DIR.value + env_name + '/' + detection_alg
     Utils.check_dir(file_path)
     Utils.save_training(log, env_name, detection_alg, file_path=file_path)

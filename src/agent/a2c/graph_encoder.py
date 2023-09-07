@@ -11,7 +11,6 @@ class GraphEncoder(nn.Module):
     def __init__(
         self,
         in_feature, 
-        # embdedding_size,
         num_layers=2):
         super(GraphEncoder, self).__init__()
 

@@ -22,7 +22,7 @@ class FilePaths(Enum):
     # ° Google Colab
     # DATASETS_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Datasets"
     # LOG_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Logs/"
-    # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/
+    # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/"
     
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'
@@ -61,7 +61,7 @@ class HyperParams(Enum):
     # ACTION_STD = 0.5
     EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
     LR = 0.0001
-    GAMMA = 0.5 # 0.97
+    GAMMA = 0.1 # 0.97
     BEST_REWARD = 0.7  # -np.inf
 
     """ Training Parameters """

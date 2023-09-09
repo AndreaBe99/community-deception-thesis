@@ -32,19 +32,19 @@ class ActorCritic(nn.Module):
             hidden_size_2=hidden_size_2
         )
         self.device = torch.device(
-            'cuda' if torch.cuda.is_available() else 'cpu')
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
 
     def forward(self, state: Data, jitter=1e-20) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass, computes action and value
-        
+
         Parameters
         ----------
         state : Data
             Graph state
         jitter : float, optional
             Jitter value, by default 1e-20
-        
+
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor]
@@ -59,4 +59,3 @@ class ActorCritic(nn.Module):
         # Critic
         value = self.critic(state)
         return concentration, value
-    

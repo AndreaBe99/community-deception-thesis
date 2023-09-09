@@ -61,7 +61,7 @@ class HyperParams(Enum):
     # ACTION_STD = 0.5
     EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
     LR = 0.0001
-    GAMMA = 0.1 # 0.97
+    GAMMA = 0.9 # 0.97
     BEST_REWARD = 0.7  # -np.inf
 
     """ Training Parameters """
@@ -269,30 +269,6 @@ class Utils:
             plt.savefig(file_name)
             plt.show()
         
-        def plot_rolling_window(
-            list_1: List[float],
-            list_2: List[float],
-            label_1: str,
-            label_2: str,
-            file_name: str,
-            window_size: int = 100):
-            time_series_1 = np.array(list_1)
-            time_series_2 = np.array(list_2)
-            # Compute the rolling windows of the time series data using NumPy
-            rolling_data_1 = np.convolve(time_series_1, np.ones(
-                window_size) / window_size, mode='valid')
-            rolling_data_2 = np.convolve(time_series_2, np.ones(
-                window_size) / window_size, mode='valid')
-            # Plot the rolling windows of the time series data using matplotlib
-            plt.plot(rolling_data_1, label=label_1)
-            plt.plot(rolling_data_2, label=label_2)
-            plt.title("Rolling Window")
-            plt.xlabel("Epochs")
-            # plt.ylabel("Epochs")
-            plt.legend()
-            plt.savefig(file_name)
-            plt.show()
-        
         file_path = file_path+"/"+env_name+"_"+detection_algorithm
         plot_time_series(
             log['train_avg_reward'],
@@ -312,22 +288,36 @@ class Utils:
             'red',
             file_path+"_training_loss.png",
         )
-
-        # Same plot with rolling window
-        plot_rolling_window(
-            log['train_reward'], 
-            log['train_steps'], 
-            'Avg Reward', 
+        
+        # Compute the rolling windows of the time series data using NumPy
+        rolling_data_1 = np.convolve(np.array(log["train_avg_reward"]),
+            np.ones(window_size) / window_size, mode='valid')
+        rolling_data_2 = np.convolve(np.array(log["train_steps"]), 
+            np.ones(window_size) / window_size, mode='valid')
+        plot_time_series(
+            rolling_data_1,
+            rolling_data_2,
+            'Avg Reward',
             'Steps per Epoch',
-            file_path+"_rolling_training_reward.png"
+            'blue',
+            'orange',
+            file_path+"_training_rolling_reward.png",
         )
-        plot_rolling_window(
-            log["a_loss"],
-            log["v_loss"],
+        # Compute the rolling windows of the time series data using NumPy
+        rolling_data_1 = np.convolve(np.array(log["a_loss"]), 
+            np.ones(window_size) / window_size, mode='valid')
+        rolling_data_2 = np.convolve(np.array(log["v_loss"]), 
+            np.ones(window_size) / window_size, mode='valid')
+        plot_time_series(
+            rolling_data_1,
+            rolling_data_2,
             'Actor Loss',
             'Critic Loss',
-            file_path+"_rolling_training_loss.png"
+            'green',
+            'red',
+            file_path+"_training_rolling_loss.png",
         )
+        
     
     @staticmethod
     def save_training(

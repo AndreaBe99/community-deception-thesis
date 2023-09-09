@@ -16,33 +16,23 @@ if __name__ == "__main__":
     graph = Utils.import_mtx_graph(graph_path)
     # ! SYNTHETIC GRAPH Graph path (change the following line to change the graph)
     # graph, graph_path = Utils.generate_lfr_benchmark_graph()
-    
     # Set the environment name as the graph name
     env_name = graph_path.split("/")[-1].split(".")[0]
-    
     # Print the number of nodes and edges
     print("* Graph Name:", env_name)
     print("*", graph)
 
     # ° --- Environment Setup --- ° #
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    detection_alg = DetectionAlgorithms.WALK.value
-    print("* Community Detection Algorithm:", detection_alg)
+    detection_alg = DetectionAlgorithms.INF.value
     # Apply the community detection algorithm on the graph
     dct = CommunityDetectionAlgorithm(detection_alg)
     community_structure = dct.compute_community(graph)
-    print("* Number of communities found:", len(community_structure.communities))
-
     # Choose one of the communities found by the algorithm, for now we choose 
     # the community with the highest number of nodes
     community_target = max(community_structure.communities, key=len)
     idx_community = community_structure.communities.index(community_target)
-    print("* Initial Community Target:", community_target)
-    print("* Initial Index of the Community Target:", idx_community)
-    # TEST: Choose a node to remove from the community
     node_target = community_target[random.randint(0, len(community_target)-1)]
-    print("* Initial Nodes Target:", node_target)
-    
     # Define the environment
     env = GraphEnvironment(
         graph=graph,
@@ -52,21 +42,28 @@ if __name__ == "__main__":
         env_name=env_name,
         community_detection_algorithm=detection_alg)
     # Get list of possible actions which can be performed on the graph by the agent
-    n_actions = len(env.possible_actions["ADD"]) + \
-        len(env.possible_actions["REMOVE"])
+    n_actions = len(env.possible_actions["ADD"]) + len(env.possible_actions["REMOVE"])
+    # Print the environment information
+    print("* Community Detection Algorithm:", detection_alg)
+    print("* Number of communities found:",len(community_structure.communities))
+    print("* Initial Community Target:", community_target)
+    print("* Initial Index of the Community Target:", idx_community)
+    print("* Initial Nodes Target:", node_target)
     print("* Number of possible actions:", n_actions)
     print("* Rewiring Budget:", env.edge_budget, "=", 
         HyperParams.BETA.value, "*", env.graph.number_of_edges(), "/ 100",)
-
-    # ° ------ Agent Setup ------ ° #
-    # Define the agent
-    agent = Agent(env=env)
-    # Print Hyperparameters of the Agent (inner method)
-    print("*", "-"*53)
-    print("*"*20, "End Information", "*"*20, "\n")
+    print("*", "-"*58, "\n")
     
-    log = agent.training()
-    file_path = FilePaths.TEST_DIR.value + env_name + '/' + detection_alg
-    Utils.check_dir(file_path)
-    Utils.save_training(log, env_name, detection_alg, file_path=file_path)
-    Utils.plot_training(log, env_name, detection_alg, file_path=file_path)
+    # ° ------ Agent Setup ------ ° #
+    # Hyperparameters
+    lr_list = [1e-3, 1e-2] # [1e-4, 1e-3, 1e-2]
+    gamma_list = [0.3] # [0.2, 0.5, 0.8]
+    reward_weight_list = [0.1] # [0.001, 0.01, 0.1, 1, 10]
+    # Define the agent
+    agent = Agent(
+        env=env, 
+        lr=lr_list, 
+        gamma=gamma_list,
+        reward_weight=reward_weight_list)
+    # Training
+    agent.grid_search()

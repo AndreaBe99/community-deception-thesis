@@ -77,6 +77,7 @@ class GraphEnvironment(object):
         # self.deception = DeceptionScore(self.community_target)
         # self.safeness = Safeness(self.graph, self.community_target, self.node_target)
         self.nmi = NormalizedMutualInformation()
+        self.old_metric_value = 0
         
         # Compute the community structure of the graph, before the action,
         # i.e. before the deception
@@ -88,6 +89,9 @@ class GraphEnvironment(object):
         self.edge_budget = self.get_edge_budget()
         # Amount of budget used
         self.used_edge_budget = 0
+        # Max Rewiring Steps during an episode, set a limit to avoid infinite episodes
+        # in case the agent does not find the target node
+        self.max_steps = self.graph.number_of_edges()#*2
         # Whether the budget for the graph rewiring is exhausted, or the target
         # node does not belong to the community anymore
         self.stop_episode = False
@@ -99,9 +103,144 @@ class GraphEnvironment(object):
         self.possible_actions = self.get_possible_actions()
         # Length of the list of possible actions to add
         self.len_add_actions = len(self.possible_actions["ADD"])
-        
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    ############################################################################
+    #                       GETTERS FUNCTIONS                                  #
+    ############################################################################
+    def get_edge_budget(self) -> int:
+        """
+        Computes the edge budget for each graph
+
+        Returns
+        -------
+        int
+            Edge budgets of the graph
+        """
+        return int(math.ceil((self.graph.number_of_edges() * self.beta / 100)))
+
+    def get_reward(self, metric: float) -> Tuple[float, bool]:
+        """
+        Computes the reward for the agent
+        
+        Parameters
+        ----------
+        metric : float
+            Metric to use to compute the reward
+
+        Returns
+        -------
+        reward : float
+            Reward of the agent
+        done : bool
+            Whether the episode is finished, if the target node does not belong
+            to the community anymore, the episode is finished
+        """
+        # if the target node still belongs to the community, the reward is negative
+        communities_list = self.community_structure_new.communities
+        if self.node_target in communities_list[self.idx_community_target]:
+            reward = -self.weight * metric
+            return reward, False
+        # if the target node does not belong to the community anymore, the reward is positive
+        reward = 1 - (self.weight * metric)
+        return reward, True
+    
+    def get_community_target_idx(
+                self,
+                community_structure: List[List[int]],
+                community_target: List[int]) -> int:
+        """
+        Returns the index of the target community in the list of communities.
+        As the target community after a rewiring action we consider the community
+        with the highest number of nodes equal to the initial community.
+        
+        Parameters
+        ----------
+        community_structure : List[List[int]]
+            List of communities
+        community_target : List[int]
+            Community of node we want to remove from it
+        
+        Returns
+        -------
+        max_list_idx : int
+            Index of the target community in the list of communities
+        """
+        max_count = 0
+        max_list_idx = 0
+        for i, lst in enumerate(community_structure):
+            count = sum(1 for x in lst if x in community_target)
+            if count > max_count:
+                max_count = count
+                max_list_idx = i
+        return max_list_idx
+
+    def get_possible_actions(self) -> dict:
+        """
+        Returns all the possible actions that can be applied to the graph
+        given a source node (self.node_target). The possible actions are:
+            - Add an edge between the source node and a node outside the community
+            - Remove an edge between the source node and a node inside the community
+        
+        Returns
+        -------
+        self.possible_actions : dict
+            Dictionary containing the possible actions that can be applied to
+            the graph. The dictionary has two keys: "ADD" and "REMOVE", each
+            key has a list of tuples as value, where each tuple is an action.
+        """
+        possible_actions = {"ADD": set(), "REMOVE": set()}
+        # Helper functions to check if a node is in/out-side the community
+
+        def in_community(node):
+            return node in self.community_target
+
+        def out_community(node):
+            return node not in self.community_target
+
+        u = self.node_target
+        for v in self.graph.nodes():
+            if u == v:
+                continue
+            # We can remove an edge iff both nodes are in the community
+            if in_community(u) and in_community(v):
+                if self.graph.has_edge(u, v):
+                    if (v, u) not in possible_actions["REMOVE"]:
+                        possible_actions["REMOVE"].add((u, v))
+            # We can add an edge iff one node is in the community and the other is not
+            elif (in_community(u) and out_community(v)) \
+                    or (out_community(u) and in_community(v)):
+                # Check if there is already an edge between the two nodes
+                if not self.graph.has_edge(u, v):
+                    if (v, u) not in possible_actions["ADD"]:
+                        possible_actions["ADD"].add((u, v))
+        return possible_actions
+    
+    ############################################################################
+    #                       EPISODE RESET FUNCTIONS                            #
+    ############################################################################
+    def reset(self) -> Data:
+        """
+        Reset the environment
+
+        Returns
+        -------
+        adj_matrix : torch.Tensor
+            Adjacency matrix of the graph
+        """
+        self.used_edge_budget = 0
+        self.stop_episode = False
+        self.graph = self.graph_copy.copy()
+        self.possible_actions = self.get_possible_actions()
+
+        # Return a PyG Data object
+        self.data_pyg = from_networkx(self.graph)
+        # Initialize the node features
+        # self.data_pyg.x = torch.randn([self.data_pyg.num_nodes, HyperParams.STATE_DIM.value])
+        self.data_pyg.x = torch.eye(self.data_pyg.num_nodes, dtype=torch.float)
+        # Initialize the batch
+        self.data_pyg.batch = torch.zeros(self.data_pyg.num_nodes).long()
+        return self.data_pyg
+    
     def change_target_node(self, node_target: int=None) -> None:
         """
         Change the target node to remove from the community
@@ -144,97 +283,10 @@ class GraphEnvironment(object):
             self.idx_community_target = idx_community
         self.change_target_node(node_target=node_target)
     
-    def get_community_target_idx(
-        self,
-        community_structure: List[List[int]],
-        community_target: List[int]) -> int:
-        """
-        Returns the index of the target community in the list of communities
-        As the target community after a rewiring action we consider the community
-        with the highest number of nodes equal to the initial community.
-        
-        Parameters
-        ----------
-        community_structure : List[List[int]]
-            List of communities
-        community_target : List[int]
-            Community of node we want to remove from it
-        
-        Returns
-        -------
-        max_list_idx : int
-            Index of the target community in the list of communities
-        """
-        max_count = 0
-        max_list_idx = 0
-        for i, lst in enumerate(community_structure):
-            count = sum(1 for x in lst if x in community_target)
-            if count > max_count:
-                max_count = count
-                max_list_idx = i
-        return max_list_idx
-    
-    def get_edge_budget(self) -> int:
-        """
-        Computes the edge budget for each graph
-
-        Returns
-        -------
-        int
-            Edge budgets of the graph
-        """
-        return int(math.ceil((self.graph.number_of_edges() * self.beta / 100)))
-
-    def get_reward(self, metric: float) -> Tuple[float, bool]:
-        """
-        Computes the reward for the agent
-        
-        Parameters
-        ----------
-        metric : float
-            Metric to use to compute the reward
-
-        Returns
-        -------
-        reward : float
-            Reward of the agent
-        done : bool
-            Whether the episode is finished, if the target node does not belong
-            to the community anymore, the episode is finished
-        """
-        # if the target node still belongs to the community, the reward is negative 
-        communities_list = self.community_structure_new.communities
-        if self.node_target in communities_list[self.idx_community_target]:
-            reward = -self.weight * metric
-            return reward, False
-        # if the target node does not belong to the community anymore, the reward is positive
-        reward = 1 - (self.weight * metric)
-        return reward, True
-
-    def reset(self) -> Data:
-        """
-        Reset the environment
-
-        Returns
-        -------
-        adj_matrix : torch.Tensor
-            Adjacency matrix of the graph
-        """
-        self.used_edge_budget = 0
-        self.stop_episode = False
-        self.graph = self.graph_copy.copy()
-        self.possible_actions = self.get_possible_actions()
-        
-        # Return a PyG Data object
-        self.data_pyg = from_networkx(self.graph)
-        # Initialize the node features
-        self.data_pyg.x = torch.randn(
-            [self.data_pyg.num_nodes, HyperParams.STATE_DIM.value])
-        # Initialize the batch
-        self.data_pyg.batch = torch.zeros(self.data_pyg.num_nodes).long()
-        return self.data_pyg
-    
-    def step(self, action: int) -> Tuple[Data, float]:
+    ############################################################################
+    #                      EPISODE STEP FUNCTIONS                              #
+    ############################################################################
+    def step(self, action: int) -> Tuple[Data, float, bool]:
         """
         Step function for the environment
         
@@ -246,12 +298,17 @@ class GraphEnvironment(object):
             
         Returns
         -------
-        self.graph, self.rewards: Tuple[torch.Tensor, float]
-            Tuple containing the new graph and the reward 
+        self.data_pyg : Data
+            PyG Data object representing the graph
+        self.rewards : float
+            Reward of the agent
+        self.stop_episode : bool
+            Whether the episode is finished, if the target node does not belong
+            to the community anymore, or the budget for the graph rewiring is
+            exhausted, the episode is finished
         """
         # ° ---- ACTION ---- ° #
-        # Take action, budget_consumed can be 0 or 1, i.e. if the action has
-        # been applied or not
+        # Take action, add/remove the edge between target node and the model output
         budget_consumed = self.apply_action(action)
         # Set a negative reward if the action has not been applied
         if budget_consumed == 0:
@@ -266,40 +323,36 @@ class GraphEnvironment(object):
         self.idx_community_target = self.get_community_target_idx(
             self.community_structure_new.communities, 
             self.community_target)
-        
-        # ! It is a NodeClustering object
-        # nmi = self.community_structure_new.normalized_mutual_information(
-        #    self.community_structure_old).score
+        # Compute the distance between the new and the old community structure
+        metric = self.community_structure_new.normalized_mutual_information(
+            self.community_structure_old).score
         # NOTE: My implementation of NMI is faster than the one in cdlib
-        # Normalized Mutual Information, value between 0 and 1
-        nmi = self.nmi.compute_nmi(
-            self.community_structure_old.communities, 
-            self.community_structure_new.communities)
+        # metric = self.nmi.compute_nmi(
+        #     self.community_structure_old.communities, 
+        #     self.community_structure_new.communities)
+        metric -= self.old_metric_value
+        self.old_metric_value = metric
+        self.community_structure_old = self.community_structure_new
         
+        # OLD CODE: old metric
         # Deception Score, value between 0 and 1
         # deception_score = self.deception.compute_deception_score(self.community_structure_new.communities, self.n_connected_components)
         # Safeness, value between 0 and 1
         # node_safeness = self.safeness.compute_community_safeness(self.nodes_target)
         # node_safeness = self.safeness.compute_node_safeness(self.nodes_target[0]) # ! Assume that there is only one node to hide
         
-        self.community_structure_old = self.community_structure_new
-        
         # ° ---- REWARD ---- ° #
-        self.rewards, done = self.get_reward(nmi)
+        self.rewards, done = self.get_reward(metric)
         # If the target node does not belong to the community anymore, 
         # the episode is finished
         if done:
             self.stop_episode = True
         
         # ° ---- BUDGET ---- ° #
-        # Compute the remaining budget
-        remaining_budget = self.edge_budget - self.used_edge_budget
-        # Decrease the remaining budget
-        updated_budget = remaining_budget - budget_consumed
-        # Update the used edge budget
-        self.used_edge_budget += (remaining_budget - updated_budget)
+        # Compute used budget
+        self.used_edge_budget += budget_consumed
         # If the budget for the graph rewiring is exhausted, stop the episode
-        if remaining_budget < 1:
+        if self.edge_budget - self.used_edge_budget < 1:
             self.stop_episode = True
             # If the budget is exhausted, and the target node still belongs to
             # the community, the reward is negative
@@ -307,7 +360,14 @@ class GraphEnvironment(object):
                 self.rewards = -1
 
         # ° ---- PyG Data ---- ° #
-        # TEST: Avoid to use from_networkx
+        # OLD CODE
+        # data = from_networkx(self.graph)
+        # data.x = self.data_pyg.x
+        # data.batch = self.data_pyg.batch
+        # self.data_pyg = data
+        
+        # Avoid to use from_networkx, in my test is slower than the following code
+        # to compute the edge_index
         edge_list = nx.to_edgelist(self.graph)
         # remove weights
         edge_list = [[e[0], e[1]] for e in edge_list]
@@ -319,56 +379,7 @@ class GraphEnvironment(object):
         edge_list_t = torch.transpose(edge_list, 0, 1)
         del edge_list
         self.data_pyg.edge_index = edge_list_t
-        # TEST END
-        
-        # Return a PyG Data object
-        # TEST data = from_networkx(self.graph)
-        # Assign the node features and the batch of the old graph to the new graph
-        # TEST data.x = self.data_pyg.x
-        # TEST data.batch = self.data_pyg.batch
-        # Update the old graph pyg data object
-        # TEST self.data_pyg = data
         return self.data_pyg, self.rewards, self.stop_episode
-    
-    def get_possible_actions(self) -> dict:
-        """
-        Returns all the possible actions that can be applied to the graph
-        given a source node (self.node_target). The possible actions are:
-            - Add an edge between the source node and a node outside the community
-            - Remove an edge between the source node and a node inside the community
-        
-        Returns
-        -------
-        self.possible_actions : dict
-            Dictionary containing the possible actions that can be applied to
-            the graph. The dictionary has two keys: "ADD" and "REMOVE", each
-            key has a list of tuples as value, where each tuple is an action.
-        """
-        possible_actions = {"ADD": set(), "REMOVE": set()}
-        # Helper functions to check if a node is in/out-side the community
-        def in_community(node):
-            return node in self.community_target
-
-        def out_community(node):
-            return node not in self.community_target
-        
-        u = self.node_target
-        for v in self.graph.nodes():
-            if u == v:
-                continue
-            # We can remove an edge iff both nodes are in the community
-            if in_community(u) and in_community(v):
-                if self.graph.has_edge(u, v):
-                    if (v, u) not in possible_actions["REMOVE"]:
-                        possible_actions["REMOVE"].add((u, v))
-            # We can add an edge iff one node is in the community and the other is not
-            elif (in_community(u) and out_community(v)) \
-                    or (out_community(u) and in_community(v)):
-                # Check if there is already an edge between the two nodes
-                if not self.graph.has_edge(u, v):
-                    if (v, u) not in possible_actions["ADD"]:
-                        possible_actions["ADD"].add((u, v))
-        return possible_actions
     
     def apply_action(self, action: int) -> int:
         """
@@ -406,9 +417,3 @@ class GraphEnvironment(object):
             self.possible_actions["REMOVE"].remove(action_reversed)
             return 1
         return 0
-
-    def plot_graph(self) -> None:
-        """Plot the graph using matplotlib"""
-        import matplotlib.pyplot as plt
-        nx.draw(self.graph, with_labels=True)
-        plt.show()

@@ -22,23 +22,21 @@ class ActorNetwork(nn.Module):
         super(ActorNetwork, self).__init__()
 
         # self.graph_encoder = GraphEncoder(state_dim)
-        # self.linear1 = nn.Linear(32, hidden_size_1)
-        # self.linear2 = nn.Linear(hidden_size_1, hidden_size_2)
-        # self.linear3 = nn.Linear(hidden_size_2, action_dim)
-
-        self.relu = nn.LeakyReLU()
-        # self.relu = nn.ReLU()
+        # self.conv1 = GCNConv(state_dim, state_dim)
+        
+        self.lin1 = nn.Linear(state_dim, hidden_size_1)
+        self.lin2 = nn.Linear(hidden_size_1, hidden_size_2)
+        self.lin3 = nn.Linear(hidden_size_2, action_dim)
+        
+        # self.relu = nn.LeakyReLU()
+        self.relu = nn.ReLU()
         # self.tanh = nn.Tanh()
 
-        self.conv1 = GCNConv(state_dim, state_dim)
-        self.lin1 = nn.Linear(state_dim, 32)
-        self.lin2 = nn.Linear(32, 32)
-        self.lin3 = nn.Linear(32, 1)
-
-    def forward(self, data):
-        out = F.relu(self.conv1(data.x, data.edge_index))
-        x = out + data.x
-        x = F.relu(self.lin1(x))
+    def forward(self, data: torch.Tensor)->torch.Tensor:
+        # out = F.relu(self.conv1(data.x, data.edge_index))
+        # x = out + data.x
+        x = F.relu(self.lin1(data))
+        # x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
         x = self.lin3(x)
         return x

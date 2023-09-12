@@ -24,13 +24,13 @@ class Agent:
     def __init__(
             self,
             env: GraphEnvironment,
-            state_dim: int = HyperParams.STATE_DIM.value,
+            state_dim: int = HyperParams.EMBEDDING_DIM.value,
             hidden_size_1: int = HyperParams.HIDDEN_SIZE_1.value,
             hidden_size_2: int = HyperParams.HIDDEN_SIZE_2.value,
-            action_dim: int = HyperParams.ACTION_DIM.value,
-            lr: List[float] = [HyperParams.LR.value],
-            gamma: List[float] = [HyperParams.GAMMA.value],
-            reward_weight: List[float] = [HyperParams.WEIGHT.value],
+            lr: List[float] = HyperParams.LR.value,
+            gamma: List[float] = HyperParams.GAMMA.value,
+            lambda_metrics: List[float] = HyperParams.LAMBDA.value,
+            alpha_metrics: List[float] = HyperParams.ALPHA.value,
             eps: float = HyperParams.EPS_CLIP.value,
             best_reward: float = HyperParams.BEST_REWARD.value):
         """
@@ -52,8 +52,12 @@ class Agent:
             List of Learning rate, each element of the list is a learning rate
         gamma : List[float]
             List of gamma parameter, each element of the list is a gamma
-        reward_weight : List[float]
-            List of reward weight, each element of the list is a reward weight
+        lambda_metrics : List[float]
+            List of lambda parameter, each element of the list is a lambda used
+            to balance the reward and the penalty
+        alpha_metrics : List[float]
+            List of alpha parameter, each element of the list is a alpha used
+            to balance the two penalties
         eps : List[float]
             Value for clipping the loss function, each element of the list is a
             clipping value
@@ -64,24 +68,28 @@ class Agent:
         self.state_dim = state_dim
         self.hidden_size_1 = hidden_size_1
         self.hidden_size_2 = hidden_size_2
-        self.action_dim = action_dim
+        self.action_dim = self.env.graph.number_of_nodes()
         self.policy = ActorCritic(
-            state_dim=self.env.graph.number_of_nodes(),  # state_dim,
+            state_dim=state_dim,
             hidden_size_1=hidden_size_1,
             hidden_size_2=hidden_size_2,
-            action_dim=action_dim)
+            action_dim=self.action_dim,
+            graph=self.env.graph
+        )
 
         # Hyperparameters
         self.lr_list = lr
         self.gamma_list = gamma
-        self.weight_list = reward_weight
+        self.lambda_metrics = lambda_metrics
+        self.alpha_metrics = alpha_metrics
         self.eps = eps
         self.best_reward = best_reward
 
         # Parameters set in the grid search
         self.lr = None
         self.gamma = None
-        self.reward_weight = None
+        self.lambda_metric = None
+        self.alpha_metric = None
         self. optimizers = dict()
 
         # Training variables
@@ -107,12 +115,10 @@ class Agent:
 
         # Print model architecture
         print("*", "-"*18, " Model Architecture ", "-"*18)
-        print("* State dimension: ", self.state_dim)
-        print("* Hidden layer 1 size: ", self.hidden_size_1)
-        print("* Hidden layer 2 size: ", self.hidden_size_2)
-        print("* Action dimension: ", self.action_dim, "*",
-              self.env.graph.number_of_nodes(), "=",
-              self.action_dim*self.env.graph.number_of_nodes())
+        print("* Embedding dimension: ", self.state_dim)
+        print("* A2C Hidden layer 1 size: ", self.hidden_size_1)
+        print("* A2C Hidden layer 2 size: ", self.hidden_size_2)
+        print("* Actor Action dimension: ", self.action_dim)
 
     ############################################################################
     #                            GRID SEARCH                                   #
@@ -121,20 +127,27 @@ class Agent:
         """Perform grid search on the hyperparameters"""
         for lr in self.lr_list:
             for gamma in self.gamma_list:
-                for reward_weight in self.weight_list:
-                    # Change Hyperparameters
-                    self.reset_hyperparams(lr, gamma, reward_weight)
-                    # Configure optimizers with the current learning rate
-                    self.configure_optimizers()
-                    # Training
-                    log = self.training()
-                    # Save results
-                    file_path = self.file_path +\
-                        f"lr-{lr}/gamma-{gamma}/reward_weight-{reward_weight}/"
-                    self.save_plots(log, file_path)
-                    gc.collect()
+                for lambda_metric in self.lambda_metrics:
+                    for alpha_metric in self.alpha_metrics:
+                        # Change Hyperparameters
+                        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric)
+                        # Configure optimizers with the current learning rate
+                        self.configure_optimizers()
+                        # Training
+                        log = self.training()
+                        # Save results
+                        file_path = self.file_path +\
+                            f"lr-{lr}/gamma-{gamma}/"+\
+                            f"lambda-{lambda_metric}/alpha-{alpha_metric}"
+                        self.save_plots(log, file_path)
+                        gc.collect()
 
-    def reset_hyperparams(self, lr: float, gamma: float, reward_weight: float) -> None:
+    def reset_hyperparams(
+        self, 
+        lr: float, 
+        gamma: float, 
+        lambda_metric: float, 
+        alpha_metric: float) -> None:
         """
         Reset hyperparameters
         
@@ -144,13 +157,17 @@ class Agent:
             Learning rate
         gamma : float
             Gamma parameter
-        reward_weight : float
-            Reward weight
+        lambda_metric : float
+            Lambda parameter used to balance the reward and the penalty
+        alpha_metric : float
+            Alpha parameter used to balance the two penalties
         """
         self.lr = lr
         self.gamma = gamma
-        self.reward_weight = reward_weight
-        self.env.weight = reward_weight
+        self.lambda_metric = lambda_metric
+        self.env.lambda_metric = lambda_metric
+        self.alpha_metric = alpha_metric
+        self.env.alpha_metric = alpha_metric
         self.print_hyperparams()
 
         self.log_dict['train_reward'] = list()
@@ -171,7 +188,8 @@ class Agent:
         print("*", "-"*18, "Model Hyperparameters", "-"*18)
         print("* Learning rate: ", self.lr)
         print("* Gamma parameter: ", self.gamma)
-        print("* Reward weight: ", self.reward_weight)
+        print("* Lambda Metric: ", self.lambda_metric)
+        print("* Alpha Metric: ", self.alpha_metric)
         print("* Value for clipping the loss function: ", self.eps)
 
     def configure_optimizers(self) -> None:
@@ -209,15 +227,6 @@ class Agent:
         epochs = trange(self.log_dict['train_episodes'])  # epoch iterator
         self.policy.train()  # set model in train mode
         for i_episode in epochs:
-            # Change Target Node every 10 episodes
-            # if i_episode % 10 == 0 and i_episode != 0:
-            #    self.env.change_target_node()
-            # Change Target Community every 100 episodes
-            # if i_episode % 100 == 0 and i_episode != 0:
-            #     self.env.change_target_community()
-            # TEST: change target node and community every episode
-            self.env.change_target_community()
-
             self.obs = self.env.reset()
             self.episode_reward = 0
             self.done = False
@@ -241,8 +250,7 @@ class Agent:
 
             # Checkpoint best performing model
             if self.episode_reward >= self.best_reward:
-                self.save_checkpoint(
-                    self.env.env_name, self.env.detection_alg)
+                self.save_checkpoint()
                 self.best_reward = self.episode_reward
 
             # Log
@@ -253,7 +261,7 @@ class Agent:
             self.log_dict['a_loss'].append(self.a_loss)
             self.log_dict['v_loss'].append(self.v_loss)
 
-        self.log(self.log_dict, self.env.env_name, self.env.detection_alg)
+        self.log(self.log_dict)
         return self.log_dict
 
     def rewiring(self, test=False) -> None:
@@ -315,7 +323,6 @@ class Agent:
         concentration, value = self.policy(state)
         dist = torch.distributions.Categorical(concentration)
         action = dist.sample()
-        # print(action)
         self.saved_actions.append(
             self.SavedAction(dist.log_prob(action), value))
         return int(action.item())
@@ -389,7 +396,7 @@ class Agent:
     def test(self):
         """Hide a given node from a given community"""
         # Load best performing model
-        self.load_checkpoint(self.env.env_name, self.env.detection_alg)
+        self.load_checkpoint()
         # Set model in evaluation mode
         self.policy.eval()
         # Get the PyG graph
@@ -426,66 +433,44 @@ class Agent:
             self.env.detection_alg,
             file_path)
 
-    def save_checkpoint(
-            self,
-            env_name: str = 'default',
-            detection_alg: str = 'default',
-            log_dir: str = FilePaths.TEST_DIR.value):
+    def save_checkpoint(self):
         """Save checkpoint"""
         log_dir = self.file_path +\
-            f"lr-{self.lr}/gamma-{self.gamma}/reward_weight-{self.reward_weight}/"
+            f"lr-{self.lr}/gamma-{self.gamma}/" +\
+            f"lambda-{self.lambda_metric}/alpha-{self.alpha_metric}"
         # Check if the directory exists, otherwise create it
         Utils.check_dir(log_dir)
-        path = f'{log_dir}/{env_name}_{detection_alg}.pth'
+        path = f'{log_dir}/model.pth'
         checkpoint = dict()
         checkpoint['model'] = self.policy.state_dict()
         for key, value in self.optimizers.items():
             checkpoint[key] = value.state_dict()
         torch.save(checkpoint, path)
 
-    def load_checkpoint(
-            self,
-            env_name: str = 'default',
-            detection_alg: str = 'default',
-            log_dir: str = FilePaths.LOG_DIR.value):
-        """Load checkpoint
-        
-        Parameters
-        ----------
-        env_name : str, optional
-            Environment name, by default 'default'
-        detection_alg : str, optional
-            Detection algorithm name, by default 'default'
-        log_dir : str, optional
-            Path to the log directory, by default FilePaths.LOG_DIR.value
-        """
-        log_dir = log_dir + env_name  # + '/' + detection_alg
-        path = f'{log_dir}/{env_name}_{detection_alg}.pth'
+    def load_checkpoint(self):
+        """Load checkpoint"""
+        log_dir = self.file_path +\
+            f"lr-{self.lr}/gamma-{self.gamma}/" +\
+            f"lambda-{self.lambda_metric}/alpha-{self.alpha_metric}"
+        # log_dir = log_dir + env_name  # + '/' + detection_alg
+        path = f'{log_dir}/model.pth'
         checkpoint = torch.load(path)
         self.policy.load_state_dict(checkpoint['model'])
         for key, _ in self.optimizers.items():
             self.optimizers[key].load_state_dict(checkpoint[key])
 
-    def log(
-            self,
-            log_dict: dict,
-            env_name: str = 'default',
-            detection_alg: str = 'default',
-            log_dir: str = FilePaths.LOG_DIR.value):
+    def log(self, log_dict: dict):
         """Log data
         
         Parameters
         ----------
         log_dict : dict
             Dictionary containing the data to be logged
-        env_name : str, optional
-            Environment name, by default 'default'
-        detection_alg : str, optional
-            Detection algorithm name, by default 'default'
-        log_dir : str, optional
-            Path to the log directory, by default FilePaths.LOG_DIR.value
         """
-        log_dir = log_dir + env_name  # + '/' + detection_alg
+        # log_dir = log_dir + env_name  # + '/' + detection_alg
+        log_dir = self.file_path +\
+            f"lr-{self.lr}/gamma-{self.gamma}/" +\
+            f"lambda-{self.lambda_metric}/alpha-{self.alpha_metric}"
         Utils.check_dir(log_dir)
-        path = f'{log_dir}/{env_name}_{detection_alg}.pth'
+        path = f'{log_dir}/model.pth'
         torch.save(log_dict, path)

@@ -44,29 +44,32 @@ class FilePaths(Enum):
 class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # Numeber of possible action with BETA=30, is 30% of the edges
-    BETA = 10  
-    # Weight to balance the reward
-    WEIGHT = 0.1  # 0.001, 0.01, 0.1, 1, 10
+    BETA = 10
+    # ° Hyperparameters  Testing ° #
+    # Weight to balance the penalty in the reward
+    LAMBDA = [0.001, 0.01, 0.1, 1, 10]
+    # Weight to balance the two metrics in the definition of the penalty
+    ALPHA = [0.001, 0.01, 0.1, 1, 10]
     
     """ Graph Encoder Parameters """""
-    STATE_DIM = 64
-    # G_HIDDEN_SIZE_1 = 128
-    # G_HIDDEN_SIZE_2 = 64
-    # G_EMBEDDING_SIZE = 32
+    EMBEDDING_DIM = 128
 
     """ Agent Parameters"""
+    # Networl Architecture
     HIDDEN_SIZE_1 = 32
     HIDDEN_SIZE_2 = 32
-    ACTION_DIM = 1      # We will return a  N*1 vector of actions, where N is the number of nodes
-    # ACTION_STD = 0.5
+    
+    # Hyperparameters for the ActorCritic
     EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
-    LR = 0.0001
-    GAMMA = 0.9 # 0.97
     BEST_REWARD = 0.7  # -np.inf
+    # ° Hyperparameters  Testing ° #
+    LR = [1e-4, 1e-3, 1e-2, 1e-1]
+    GAMMA = [0.3, 0.5, 0.7, 0.9]
+    
 
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 1000  # 200 # 15000
+    MAX_EPISODES = 1000#0
     # Dictonary for logging
     LOG_DICT = {
         'train_reward': [],
@@ -90,22 +93,6 @@ class HyperParams(Enum):
     AVERAGE_DEGREE = 5
     MIN_COMMUNITY = 20
     SEED= 10
-
-    """Old Training Parameters"""
-    # Maximum number of time steps per episode
-    # MAX_TIMESTEPS = 10  # ! Unused, I set it to the double of the edge budget
-    # Update the policy after N timesteps
-    # UPDATE_TIMESTEP = 100  # ! Unused, I set it to 10 times the edge budget
-    # Update policy for K epochs
-    # K_EPOCHS = 20
-    # Print info about the model after N episodes
-    # LOG_INTERVAL = 20
-    # Exit if the average reward is greater than this value
-    # SOLVED_REWARD = 0.7
-    # Save model after N episodes
-    # SAVE_MODEL = int(MAX_EPISODES / 10)
-    # Use a random seed
-    # RANDOM_SEED = 42
 
 
 class DetectionAlgorithms(Enum):
@@ -269,7 +256,6 @@ class Utils:
             plt.savefig(file_name)
             plt.show()
         
-        file_path = file_path+"/"+env_name+"_"+detection_algorithm
         plot_time_series(
             log['train_avg_reward'],
             log['train_steps'],
@@ -277,7 +263,7 @@ class Utils:
             'Steps per Epoch',
             'blue',
             'orange',
-            file_path+"_training_reward.png",
+            file_path+"/training_reward.png",
         )
         plot_time_series(
             log["a_loss"],
@@ -286,7 +272,7 @@ class Utils:
             'Critic Loss',
             'green',
             'red',
-            file_path+"_training_loss.png",
+            file_path+"/training_loss.png",
         )
         
         # Compute the rolling windows of the time series data using NumPy
@@ -301,7 +287,7 @@ class Utils:
             'Steps per Epoch',
             'blue',
             'orange',
-            file_path+"_training_rolling_reward.png",
+            file_path+"/training_rolling_reward.png",
         )
         # Compute the rolling windows of the time series data using NumPy
         rolling_data_1 = np.convolve(np.array(log["a_loss"]), 
@@ -315,7 +301,7 @@ class Utils:
             'Critic Loss',
             'green',
             'red',
-            file_path+"_training_rolling_loss.png",
+            file_path+"/training_rolling_loss.png",
         )
         
     
@@ -338,6 +324,6 @@ class Utils:
         file_path : str
             Path to save the plot
         """
-        file_name = f"{file_path}/{env_name}_{detection_algorithm}_results.json"
+        file_name = f"{file_path}/results.json"
         with open(file_name, "w", encoding="utf-8") as f:
             json.dump(log, f, indent=4)

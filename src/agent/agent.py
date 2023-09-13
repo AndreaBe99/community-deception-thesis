@@ -1,22 +1,17 @@
 """Module for the agent class"""
 from src.agent.a2c.a2c import ActorCritic
-from src.agent.a2c.memory import Memory
 from src.environment.graph_env import GraphEnvironment
 from src.utils.utils import HyperParams, FilePaths, Utils
 
+from tqdm import trange
 from collections import namedtuple
 from typing import List, Tuple
-
 from torch_geometric.data import Data
-from torch_geometric.data import Batch
 from torch.nn import functional as F
-from torch import nn
-import torch
 
-from tqdm import trange
-import numpy as np
-import random
-import os
+import networkx as nx
+import torch
+import json
 import gc
 
 
@@ -64,7 +59,10 @@ class Agent:
         best_reward : float, optional
             Best reward, by default 0.8
         """
+        # ° ----- Environment ----- ° #
         self.env = env
+        
+        # ° ----- A2C ----- ° #
         self.state_dim = state_dim
         self.hidden_size_1 = hidden_size_1
         self.hidden_size_2 = hidden_size_2
@@ -76,78 +74,58 @@ class Agent:
             action_dim=self.action_dim,
             graph=self.env.graph
         )
-
-        # Hyperparameters
+        # Set device
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        # Move model to device
+        self.policy.to(self.device)
+        
+        # ° ----- Hyperparameters ----- ° #
+        # A2C hyperparameters
         self.lr_list = lr
         self.gamma_list = gamma
-        self.lambda_metrics = lambda_metrics
-        self.alpha_metrics = alpha_metrics
         self.eps = eps
         self.best_reward = best_reward
-
-        # Parameters set in the grid search
+        # Environment hyperparameters
+        self.lambda_metrics = lambda_metrics
+        self.alpha_metrics = alpha_metrics
+        # Hyperparameters to be set during grid search
         self.lr = None
         self.gamma = None
-        self.lambda_metric = None
         self.alpha_metric = None
         self. optimizers = dict()
 
-        # Training variables
+        # ° ----- Training ----- ° #
+        # State, nx.Graph
         self.obs = None
+        # Cumulative reward of the episode
         self.episode_reward = 0
+        # Boolean variable to check if the episode is ended
         self.done = False
+        # Number of steps in the episode
         self.step = 0
+        # Tuple to store the values for each action
         self.SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
         self.saved_actions = []
         self.rewards = []
-
-        # Set device
-        self.device = torch.device(
-            'cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.policy.to(self.device)
-
         # Initialize lists for logging, it contains: avg_reward, avg_steps per episode
         self.log_dict = HyperParams.LOG_DICT.value
-        # PAth for save the model and the log
-        self.file_path = FilePaths.TEST_DIR.value +\
-            self.env.env_name + '/' +\
-            self.env.detection_alg + '/'
-
-        # Print model architecture
-        print("*", "-"*18, " Model Architecture ", "-"*18)
-        print("* Embedding dimension: ", self.state_dim)
-        print("* A2C Hidden layer 1 size: ", self.hidden_size_1)
-        print("* A2C Hidden layer 2 size: ", self.hidden_size_2)
-        print("* Actor Action dimension: ", self.action_dim)
+        # Print agent info
+        self.print_agent_info()
+        
+        # ° ----- Evaluation ----- ° #
+        # List of actions performed during the evaluation
+        self.action_list = {"ADD": [], "REMOVE": []}
 
     ############################################################################
-    #                            GRID SEARCH                                   #
+    #                       PRE-TRAINING/TESTING                               #
     ############################################################################
-    def grid_search(self) -> None:
-        """Perform grid search on the hyperparameters"""
-        for lr in self.lr_list:
-            for gamma in self.gamma_list:
-                for lambda_metric in self.lambda_metrics:
-                    for alpha_metric in self.alpha_metrics:
-                        # Change Hyperparameters
-                        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric)
-                        # Configure optimizers with the current learning rate
-                        self.configure_optimizers()
-                        # Training
-                        log = self.training()
-                        # Save results
-                        file_path = self.file_path +\
-                            f"lr-{lr}/gamma-{gamma}/"+\
-                            f"lambda-{lambda_metric}/alpha-{alpha_metric}"
-                        self.save_plots(log, file_path)
-                        gc.collect()
-
     def reset_hyperparams(
         self, 
         lr: float, 
         gamma: float, 
         lambda_metric: float, 
-        alpha_metric: float) -> None:
+        alpha_metric: float,
+        test: bool = False) -> None:
         """
         Reset hyperparameters
         
@@ -156,41 +134,35 @@ class Agent:
         lr : float
             Learning rate
         gamma : float
-            Gamma parameter
+            Discount factor
         lambda_metric : float
             Lambda parameter used to balance the reward and the penalty
         alpha_metric : float
             Alpha parameter used to balance the two penalties
+        test : bool, optional
+            Print hyperparameters during training, by default False
         """
+        # Set A2C hyperparameters
         self.lr = lr
         self.gamma = gamma
-        self.lambda_metric = lambda_metric
+        # Set environment hyperparameters
         self.env.lambda_metric = lambda_metric
-        self.alpha_metric = alpha_metric
         self.env.alpha_metric = alpha_metric
-        self.print_hyperparams()
-
-        self.log_dict['train_reward'] = list()
-        self.log_dict['train_steps'] = list()
-        self.log_dict['train_avg_reward'] = list()
-        self.log_dict['a_loss'] = list()
-        self.log_dict['v_loss'] = list()
+        # Print hyperparameters if we are not testing
+        if not test: self.print_hyperparams()
+        # Clear logs, except for the training episodes
+        for key in self.log_dict.keys():
+            if key != 'train_episodes':
+                self.log_dict[key] = list()
+        # Clear action list
         self.saved_actions = []
         self.rewards = []
-
+        # Clear state
         self.obs = None
         self.episode_reward = 0
         self.done = False
         self.step = 0
         self.optimizers = dict()
-
-    def print_hyperparams(self):
-        print("*", "-"*18, "Model Hyperparameters", "-"*18)
-        print("* Learning rate: ", self.lr)
-        print("* Gamma parameter: ", self.gamma)
-        print("* Lambda Metric: ", self.lambda_metric)
-        print("* Alpha Metric: ", self.alpha_metric)
-        print("* Value for clipping the loss function: ", self.eps)
 
     def configure_optimizers(self) -> None:
         """
@@ -207,11 +179,30 @@ class Agent:
             actor_params, lr=self.lr)
         self.optimizers['c_optimizer'] = torch.optim.Adam(
             critic_params, lr=self.lr)
+    
+    ############################################################################
+    #                            GRID SEARCH                                   #
+    ############################################################################
+    def grid_search(self) -> None:
+        """Perform grid search on the hyperparameters"""
+        for lr in self.lr_list:
+            for gamma in self.gamma_list:
+                for lambda_metric in self.lambda_metrics:
+                    for alpha_metric in self.alpha_metrics:
+                        # Change Hyperparameters
+                        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric)
+                        # Configure optimizers with the current learning rate
+                        self.configure_optimizers()
+                        # Training
+                        log = self.training()
+                        # Save results in correct folder
+                        self.save_plots(log, self.get_path())
+                        # Free memory
+                        gc.collect()
 
     ############################################################################
     #                               TRAINING                                   #
     ############################################################################
-
     def training(self) -> dict:
         """
         Train the agent on the environment, change the target node every 10
@@ -231,15 +222,12 @@ class Agent:
             self.episode_reward = 0
             self.done = False
             self.step = 0
-
             # Rewiring the graph until the target node is isolated from the
             # target community
             while not self.done and self.step < self.env.max_steps:
                 self.rewiring()
-
             # perform on-policy backpropagation
             self.a_loss, self.v_loss = self.training_step()
-
             # Send current statistics to screen
             epochs.set_description(
                 f"* Episode {i_episode+1} " +
@@ -247,12 +235,10 @@ class Agent:
                 f"| Avg Steps: {self.step} " +
                 f"| Actor Loss: {self.a_loss:.2f} " +
                 f"| Critic Loss: {self.v_loss:.2f}")
-
             # Checkpoint best performing model
             if self.episode_reward >= self.best_reward:
                 self.save_checkpoint()
                 self.best_reward = self.episode_reward
-
             # Log
             self.log_dict['train_reward'].append(self.episode_reward)
             self.log_dict['train_steps'].append(self.step)
@@ -260,8 +246,6 @@ class Agent:
                 self.episode_reward/self.step)
             self.log_dict['a_loss'].append(self.a_loss)
             self.log_dict['v_loss'].append(self.v_loss)
-
-        self.log(self.log_dict)
         return self.log_dict
 
     def rewiring(self, test=False) -> None:
@@ -275,35 +259,23 @@ class Agent:
         """
         # Select action: return a list of the probabilities of each action
         action_rl = self.select_action(self.obs)
-        # print("Action:", action_rl)
         torch.cuda.empty_cache()
+        # Save rewiring action if we are testing
+        if test:
+            edge = (self.env.node_target, action_rl)
+            if edge in self.env.possible_actions["ADD"]:
+                if not self.env.graph.has_edge(*edge):
+                    self.action_list["ADD"].append(edge)
+            elif edge in self.env.possible_actions["REMOVE"]:
+                if self.env.graph.has_edge(*edge):
+                    self.action_list["REMOVE"].append(edge)
         # Take action in environment
         self.obs, reward, self.done = self.env.step(action_rl)
-        # Print rewiring action if we are testing
-        if test:
-            # Define the edge to be rewired, also his reverse
-            edge = (self.env.node_target, action_rl)
-            edge_reverse = (action_rl, self.env.node_target)
-            if edge in self.env.possible_actions or\
-                    edge_reverse in self.env.possible_actions:
-                # Remove edge
-                if edge in self.env.graph.edges() or\
-                        edge_reverse in self.env.graph.edges():
-                    print(f"Remove: {edge} | Reward: {reward}")
-                # Add edge
-                if edge not in self.env.graph.edges() or\
-                        edge_reverse not in self.env.graph.edges():
-                    print(f"Add: {edge} | Reward: {reward}")
-            # Node is isolated from community
-            if self.done:
-                print(f"Node {self.env.node_target} is isolated from " +
-                      f"community {self.env.community_target}")
-        else:
-            # Update reward
-            self.episode_reward += reward
-            # Store the transition in memory
-            self.rewards.append(reward)
-            self.step += 1
+        # Update reward
+        self.episode_reward += reward
+        # Store the transition in memory
+        self.rewards.append(reward)
+        self.step += 1
 
     def select_action(self, state: Data) -> int:
         """
@@ -345,14 +317,12 @@ class Agent:
         policy_losses = []  # list to save actor (policy) loss
         value_losses = []  # list to save critic (value) loss
         returns = []  # list to save the true values
-
-        # calculate the true value using rewards returned from the environment
+        # Compute the true value using rewards returned from the environment
         for r in self.rewards[::-1]:
             # calculate the discounted value
             R = r + self.gamma * R
             # insert to the beginning of the list
             returns.insert(0, R)
-
         # Normalize returns by subtracting mean and dividing by standard deviation
         # NOTE: May cause NaN problem
         if len(returns) > 1:
@@ -360,7 +330,6 @@ class Agent:
             returns = (returns - returns.mean()) / (returns.std() + self.eps)
         else:
             returns = torch.tensor(returns)
-
         # Computing losses
         for (log_prob, value), R in zip(saved_actions, returns):
             # Difference between true value and estimated value from critic
@@ -370,21 +339,18 @@ class Agent:
             # calculate critic (value) loss using L1 smooth loss
             value_losses.append(F.smooth_l1_loss(
                 value, torch.tensor([R]).to(self.device)))
-
         # take gradient steps
         self.optimizers['a_optimizer'].zero_grad()
         a_loss = torch.stack(policy_losses).sum()
         a_loss.backward()
         self.optimizers['a_optimizer'].step()
-
         self.optimizers['c_optimizer'].zero_grad()
         v_loss = torch.stack(value_losses).sum()
         v_loss.backward()
         self.optimizers['c_optimizer'].step()
-
+        # Compute mean losses
         mean_a_loss = torch.stack(policy_losses).mean().item()
         mean_v_loss = torch.stack(value_losses).mean().item()
-
         # reset rewards and action buffer
         del self.rewards[:]
         del self.saved_actions[:]
@@ -393,23 +359,46 @@ class Agent:
     ############################################################################
     #                               TEST                                       #
     ############################################################################
-    def test(self):
+    def test(
+        self, 
+        lr: float, 
+        gamma: float, 
+        lambda_metric: float, 
+        alpha_metric: float) -> nx.Graph:
         """Hide a given node from a given community"""
+        # Set hyperparameters to select the correct folder
+        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric, True)
         # Load best performing model
         self.load_checkpoint()
         # Set model in evaluation mode
         self.policy.eval()
-        # Get the PyG graph
         self.obs = self.env.reset()
-        # self.episode_reward = 0
-        # self.done = False
-        # self.step = 0
-        while not self.done:
+        # Rewiring the graph until the target node is isolated from the
+        # target community
+        while not self.done and self.step < self.env.max_steps:
             self.rewiring(test=True)
+        if self.step >= self.env.max_steps:
+            print("* !!!Maximum number of steps reached!!!")
+        return self.obs
 
     ############################################################################
     #                            CHECKPOINTING                                 #
     ############################################################################
+    def get_path(self) -> str:
+        """
+        Return the path of the folder where to save the plots and the logs
+        
+        Returns
+        -------
+        file_path : str
+            Path to the correct folder
+        """
+        file_path = FilePaths.LOG_DIR.value + \
+            f"{self.env.env_name}/{self.env.detection_alg}/" +\
+            f"lr-{self.lr}/gamma-{self.gamma}/" +\
+            f"lambda-{self.env.lambda_metric}/alpha-{self.env.alpha_metric}"
+        return file_path
+    
     def save_plots(self, log: dict, file_path: str) -> None:
         """
         Save training plots and logs
@@ -422,11 +411,12 @@ class Agent:
             Path to the directory where to save the plots and the logs
         """
         Utils.check_dir(file_path)
-        Utils.save_training(
-            log,
-            self.env.env_name,
-            self.env.detection_alg,
-            file_path)
+        self.log(log)
+        # Utils.save_training(
+        #     log,
+        #     self.env.env_name,
+        #     self.env.detection_alg,
+        #     file_path)
         Utils.plot_training(
             log,
             self.env.env_name,
@@ -435,24 +425,19 @@ class Agent:
 
     def save_checkpoint(self):
         """Save checkpoint"""
-        log_dir = self.file_path +\
-            f"lr-{self.lr}/gamma-{self.gamma}/" +\
-            f"lambda-{self.lambda_metric}/alpha-{self.alpha_metric}"
+        log_dir = self.get_path()
         # Check if the directory exists, otherwise create it
         Utils.check_dir(log_dir)
-        path = f'{log_dir}/model.pth'
         checkpoint = dict()
         checkpoint['model'] = self.policy.state_dict()
         for key, value in self.optimizers.items():
             checkpoint[key] = value.state_dict()
+        path = f'{log_dir}/model.pth'
         torch.save(checkpoint, path)
 
     def load_checkpoint(self):
         """Load checkpoint"""
-        log_dir = self.file_path +\
-            f"lr-{self.lr}/gamma-{self.gamma}/" +\
-            f"lambda-{self.lambda_metric}/alpha-{self.alpha_metric}"
-        # log_dir = log_dir + env_name  # + '/' + detection_alg
+        log_dir = self.get_path()
         path = f'{log_dir}/model.pth'
         checkpoint = torch.load(path)
         self.policy.load_state_dict(checkpoint['model'])
@@ -467,10 +452,33 @@ class Agent:
         log_dict : dict
             Dictionary containing the data to be logged
         """
-        # log_dir = log_dir + env_name  # + '/' + detection_alg
-        log_dir = self.file_path +\
-            f"lr-{self.lr}/gamma-{self.gamma}/" +\
-            f"lambda-{self.lambda_metric}/alpha-{self.alpha_metric}"
+        log_dir = self.get_path()
         Utils.check_dir(log_dir)
-        path = f'{log_dir}/model.pth'
-        torch.save(log_dict, path)
+        file_name = f'{log_dir}/results.json'
+        with open(file_name, "w", encoding="utf-8") as f:
+            json.dump(log_dict, f, indent=4)
+    
+    ############################################################################
+    #                   AGENT INFO AND PRINTING                                #
+    ############################################################################
+    def print_agent_info(self):
+        # Print model architecture
+        print("*", "-"*18, " Model Architecture ", "-"*18)
+        print("* Embedding dimension: ", self.state_dim)
+        print("* A2C Hidden layer 1 size: ", self.hidden_size_1)
+        print("* A2C Hidden layer 2 size: ", self.hidden_size_2)
+        print("* Actor Action dimension: ", self.action_dim)
+        # Print Hyperparameters List
+        print("*", "-"*18, "Hyperparameters List", "-"*18)
+        print("* Learning rate list: ", self.lr_list)
+        print("* Gamma parameter list: ", self.gamma_list)
+        print("* Lambda Metric list: ", self.lambda_metrics)
+        print("* Alpha Metric list: ", self.alpha_metrics)
+    
+    def print_hyperparams(self):
+        print("*", "-"*18, "Model Hyperparameters", "-"*18)
+        print("* Learning rate: ", self.lr)
+        print("* Gamma parameter: ", self.gamma)
+        print("* Lambda Metric: ", self.env.lambda_metric)
+        print("* Alpha Metric: ", self.env.alpha_metric)
+        print("* Value for clipping the loss function: ", self.eps)

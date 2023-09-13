@@ -1,4 +1,3 @@
-"""Module to store utility functions and constants"""
 from enum import Enum
 from typing import List, Tuple
 import matplotlib.pyplot as plt
@@ -45,31 +44,34 @@ class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # Numeber of possible action with BETA=30, is 30% of the edges
     BETA = 10
+    # Strength of the deception constraint, value between 0 and 1, 
+    # with 1 soft constraint, 0 hard constraint
+    T = 0.5
     # ° Hyperparameters  Testing ° #
     # Weight to balance the penalty in the reward
-    LAMBDA = [0.001, 0.01, 0.1, 1, 10]
+    LAMBDA = [0.1] # [0.01, 0.1, 1]
     # Weight to balance the two metrics in the definition of the penalty
-    ALPHA = [0.001, 0.01, 0.1, 1, 10]
+    ALPHA = [0.1] # [0.3, 0.5, 0.7]
     
     """ Graph Encoder Parameters """""
-    EMBEDDING_DIM = 128
+    EMBEDDING_DIM = 128 # 256
 
     """ Agent Parameters"""
     # Networl Architecture
-    HIDDEN_SIZE_1 = 32
+    HIDDEN_SIZE_1 = 64
     HIDDEN_SIZE_2 = 32
     
     # Hyperparameters for the ActorCritic
     EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
     BEST_REWARD = 0.7  # -np.inf
     # ° Hyperparameters  Testing ° #
-    LR = [1e-4, 1e-3, 1e-2, 1e-1]
-    GAMMA = [0.3, 0.5, 0.7, 0.9]
+    LR = [1e-3] # [1e-3, 1e-2, 1e-1]
+    GAMMA = [0.3] # [0.3, 0.5, 0.7]
     
 
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 1000#0
+    MAX_EPISODES = 5 #1000
     # Dictonary for logging
     LOG_DICT = {
         'train_reward': [],
@@ -83,6 +85,43 @@ class HyperParams(Enum):
         'v_loss': [],
         # set max number of training episodes
         'train_episodes': MAX_EPISODES,
+    }
+    
+    """Evaluation Parameters"""
+    LR_EVAL = 1e-3
+    GAMMA_EVAL = 0.3
+    LAMBDA_EVAL = 0.1
+    ALPHA_EVAL = 0.1
+    STEPS_EVAL = 10#00
+    EVAL_DICT = {
+        "agent": {
+            "goal": [],
+            "nmi": [],
+            "time": [],
+            "steps": [],
+            "lr": None,
+            "gamma": None,
+            "lambda_metric": None,
+            "alpha_metric": None,
+        },
+        "rh": {
+            "goal": [],
+            "nmi": [],
+            "time": [],
+            "steps": [],
+        },
+        "dh": {
+            "goal": [],
+            "nmi": [],
+            "time": [],
+            "steps": [],
+        },
+        "di": {
+            "goal": [],
+            "nmi": [],
+            "time": [],
+            "steps": [],
+        },
     }
     
     """Graph Generation Parameters"""
@@ -254,7 +293,7 @@ class Utils:
             plt.title(
                 f"Training on {env_name} graph with {detection_algorithm} algorithm")
             plt.savefig(file_name)
-            plt.show()
+            # plt.show()
         
         plot_time_series(
             log['train_avg_reward'],
@@ -305,25 +344,107 @@ class Utils:
         )
         
     
+    ############################################################################
+    #                               EVALUATION                                 #
+    ############################################################################
+    def check_goal(
+        target_node: int, 
+        original_community: List[int],
+        new_community: List[int]) -> int:
+        """
+        As new community target after the action, we consider the 
+        community that contains the target node, if this community satisfies 
+        the deception constraint, the episode is finished, otherwise not. 
+        If yes, return 1, i.e. the goal is achieved, otherwise, return 0, 
+        i.e. the goal is not achieved.
+
+        Parameters
+        ----------
+        target_node : int
+            Target node to be hidden from the community
+        original_community : List[int]
+            Original target community before deception 
+        new_community : List[int]
+            Target community in the new community structure after some rewiring
+        
+        Returns
+        -------
+        int
+            1 if the goal is achieved, 0 otherwise
+        """
+        if len(new_community) == 1:
+            return 1
+        intersection = set(new_community).intersection(set(original_community))
+        intersection.remove(target_node)
+        k = min(len(new_community)-1, len(original_community)-1)
+        assert k > 0, "k must be greater than 0"
+        t = len(intersection) / k
+        if t <= HyperParams.T.value:
+            return 1
+        return 0
+    
+    def get_new_community(
+        node_target: int,
+        new_community_structure: List[List[int]]) -> List[int]:
+        """
+        Search the community target in the new community structure after 
+        deception. As new community target after the action, we consider the 
+        community that contains the target node, if this community satisfies 
+        the deception constraint, the episode is finished, otherwise not.
+
+        Parameters
+        ----------
+        node_target : int
+            Target node to be hidden from the community
+        new_community_structure : List[List[int]]
+            New community structure after deception
+
+        Returns
+        -------
+        List[int]
+            New community target after deception
+        """
+        for community in new_community_structure.communities:
+            if node_target in community:
+                return community
+        raise ValueError("Community not found")
+    
+    def save_metrics(
+        log_dict: dict, alg: str, goal: int, 
+        nmi: float, time: float, steps: int) -> dict:
+        """Save the metrics of the algorithm in the log dictionary"""
+        log_dict[alg]["goal"].append(goal)
+        log_dict[alg]["nmi"].append(nmi)
+        log_dict[alg]["time"].append(time)
+        log_dict[alg]["steps"].append(steps)
+        return log_dict
+    
     @staticmethod
-    def save_training(
-            log: dict,
-            env_name: str,
-            detection_algorithm: str,
-            file_path: str):
-        """Plot the training results
+    def save_test(log: dict, files_path: str):
+        """Save and Plot the testing results
 
         Parameters
         ----------
         log : dict
             Dictionary containing the training logs
-        env_name : str
-            Name of the environment
-        detection_algorithm : str
-            Name of the detection algorithm
-        file_path : str
+        files_path : str
             Path to save the plot
         """
-        file_name = f"{file_path}/results.json"
+        file_name = f"{files_path}/evaluation_results.json"
+        # Save json file
         with open(file_name, "w", encoding="utf-8") as f:
             json.dump(log, f, indent=4)
+        
+        # Plot the results
+        # Algorithms
+        list_algs = ["agent", "rh", "dh", "di"]
+        # Metrics for each algorithm
+        metrics = ["goal", "nmi", "time", "steps"]
+        for metric in metrics:
+            fig, ax = plt.subplots()
+            ax.set_title(metric)
+            for alg in list_algs:
+                ax.plot(log[alg][metric], label=alg)
+            ax.legend()
+            plt.savefig(f"{files_path}/{metric}.png")
+

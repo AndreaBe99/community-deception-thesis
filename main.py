@@ -1,12 +1,28 @@
 from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
-from src.community_algs.detection_algs import DetectionAlgorithm, CommunityDetectionAlgorithm
 from src.environment.graph_env import GraphEnvironment
-from src.agent.a2c.memory import Memory
 from src.agent.agent import Agent
-import random
 
+from src.utils.test import test
+import argparse
+
+
+def get_args():
+    """
+    Function for handling command line arguments
+
+    Returns
+    -------
+    args : argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description='PyTorch A2C')
+    # Mode: train or test
+    parser.add_argument('--mode', type=str, default='train',
+                        help='train or test')
+    # Argument parsing
+    return parser.parse_args()
 
 if __name__ == "__main__":
+    args = get_args()
     print("*"*20, "Setup Information", "*"*20)
 
     # ° ------ Graph Setup ------ ° #
@@ -31,18 +47,14 @@ if __name__ == "__main__":
         env_name=env_name,
         community_detection_algorithm=detection_alg)
 
-    # ° ------ Agent Setup ------ ° #
-    # Hyperparameters
-    lr_list = [1e-3] # HyperParams.LR.value          # [1e-4, 1e-3, 1e-2, 1e-1]
-    gamma_list = [0.3] # HyperParams.GAMMA.value    # [0.3, 0.5, 0.7, 0.9]
-    lambda_list = [0.1] # HyperParams.LAMBDA.value  # [0.001, 0.01, 0.1, 1, 10]
-    alpha_list = [0.1] # HyperParams.ALPHA.value    # [0.001, 0.01, 0.1, 1, 10]
     # Define the agent
-    agent = Agent(
-        env=env,
-        lr=lr_list,
-        gamma=gamma_list,
-        lambda_metrics=lambda_list,
-        alpha_metrics=alpha_list)
-    # Training
-    agent.grid_search()
+    agent = Agent(env=env)
+    # ° ------ TRAIN ------ ° #
+    if args.mode == "train":
+        # Training
+        agent.grid_search()
+    # ° ------ TEST ------ ° #
+    elif args.mode == 'test':
+        test(agent=agent)
+    else:
+        raise ValueError("Invalid mode. Please choose between 'train' and 'test'")

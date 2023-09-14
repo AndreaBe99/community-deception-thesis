@@ -71,14 +71,13 @@ def test(
         community_target = agent.env.community_target
         node_target = agent.env.node_target
         # ° ------------------------------------------ ° #
-        
         # Get new target community after deception
-        agent_community = get_new_community(node_target, agent.env.new_community_structure)
+        agent_community = Utils.get_new_community(node_target, agent.env.new_community_structure)
         # Compute NMI between the new community structure and the original one
         agent_nmi = community_structure.normalized_mutual_information(
             agent.env.new_community_structure).score
         # Check if the goal of hiding the target node was achieved
-        agent_goal = check_goal(agent.env, node_target, community_target, agent_community)
+        agent_goal = Utils.check_goal(agent.env, node_target, community_target, agent_community)
         # Save the metrics
         log_dict = save_metrics(
             log_dict, "agent", agent_goal, agent_nmi, end, agent.step)
@@ -87,23 +86,22 @@ def test(
         # Perform Deception with the baseline algorithms
         # ° ------ Random Hiding ------ ° #
         random_hiding = RandomHiding(
-            graph=agent.env.original_graph,
+            env=agent.env,
             steps=agent.env.edge_budget,
-            target_node=node_target,
-            target_community=community_target,
-            detection_alg=agent.env.detection_alg)
-        
+            target_community=community_target)
+
         start = time.time()
         rh_graph, rh_communities = random_hiding.hide_target_node_from_community()
         end = time.time() - start
         
         # Get new target community after deception
-        rh_community = get_new_community(node_target, rh_communities)
+        rh_community = Utils.get_new_community(node_target, rh_communities)
         # Compute NMI between the new community structure and the original one
         rh_nmi = community_structure.normalized_mutual_information(
             rh_communities).score
         # Check if the goal of hiding the target node was achieved
-        rh_goal = check_goal(agent.env, node_target, community_target, rh_community)
+        rh_goal = Utils.check_goal(
+            agent.env, node_target, community_target, rh_community)
         # Save the metrics
         log_dict = save_metrics(
             log_dict, "rh", rh_goal, rh_nmi, end, agent.env.edge_budget-random_hiding.steps)
@@ -111,22 +109,22 @@ def test(
 
         # ° ------ Degree Hiding ------ ° #
         degree_hiding = DegreeHiding(
-            graph=agent.env.original_graph,
+            env=agent.env,
             steps=agent.env.edge_budget,
-            target_node=node_target,
-            target_community=community_target,
-            detetion_alg=agent.env.detection_alg)
+            target_community=community_target)
+
         start = time.time()
         dh_graph, dh_communities = degree_hiding.hide_target_node_from_community()
         end = time.time() - start
         
         # Get new target community after deception
-        dh_community = get_new_community(node_target, dh_communities)
+        dh_community = Utils.get_new_community(node_target, dh_communities)
         # Compute NMI between the new community structure and the original one
         dh_nmi = community_structure.normalized_mutual_information(
             dh_communities).score
         # Check if the goal of hiding the target node was achieved
-        dh_goal = check_goal(agent.env, node_target, community_target, dh_community)
+        dh_goal = Utils.check_goal(
+            agent.env, node_target, community_target, dh_community)
         # Save the metrics
         log_dict = save_metrics(
             log_dict, "dh", dh_goal, dh_nmi, end, agent.env.edge_budget-degree_hiding.steps)
@@ -141,12 +139,13 @@ def test(
         end = time.time() - start
         
         # Get new target community after deception
-        di_community = get_new_community(node_target, di_communities)
+        di_community = Utils.get_new_community(node_target, di_communities)
         # Compute NMI between the new community structure and the original one
         di_nmi = community_structure.normalized_mutual_information(
             di_communities).score
         # Check if the goal of hiding the target node was achieved
-        di_goal = check_goal(agent.env, node_target, community_target, di_community)
+        di_goal = Utils.check_goal(
+            agent.env, node_target, community_target, di_community)
         # Save the metrics
         log_dict = save_metrics(
             log_dict, "di", di_goal, di_nmi, end, agent.env.edge_budget)
@@ -161,77 +160,6 @@ def test(
 ################################################################################
 #                               Utility Functions                              #
 ################################################################################
-def check_goal(
-        env: GraphEnvironment,
-        node_target: int,
-        old_community: int,
-        new_community: int) -> int:
-    """
-    Check if the goal of hiding the target node was achieved
-
-    Parameters
-    ----------
-    env : GraphEnvironment
-        Environment of the agent
-    node_target : int
-        Target node
-    old_community : int
-        Original community of the target node
-    new_community : int
-        New community of the target node
-    similarity_function : Callable
-        Similarity function to use
-        
-    Returns
-    -------
-    int
-        1 if the goal was achieved, 0 otherwise
-    """
-    if len(new_community) == 1:
-        return 1
-    # Copy the communities to avoid modifying the original ones
-    new_community_copy = new_community.copy()
-    new_community_copy.remove(node_target)
-    old_community_copy = old_community.copy()
-    old_community_copy.remove(node_target)
-    # Compute the similarity between the new and the old community
-    similarity = env.community_similarity(
-        new_community_copy,
-        old_community_copy
-    )
-    del new_community_copy, old_community_copy
-    if similarity <= env.tau:
-        return 1
-    return 0
-
-
-def get_new_community(
-        node_target: int,
-        new_community_structure: List[List[int]]) -> List[int]:
-    """
-    Search the community target in the new community structure after 
-    deception. As new community target after the action, we consider the 
-    community that contains the target node, if this community satisfies 
-    the deception constraint, the episode is finished, otherwise not.
-
-    Parameters
-    ----------
-    node_target : int
-        Target node to be hidden from the community
-    new_community_structure : List[List[int]]
-        New community structure after deception
-
-    Returns
-    -------
-    List[int]
-        New community target after deception
-    """
-    for community in new_community_structure.communities:
-        if node_target in community:
-            return community
-    raise ValueError("Community not found")
-
-
 def save_metrics(
         log_dict: dict, alg: str, goal: int,
         nmi: float, time: float, steps: int) -> dict:

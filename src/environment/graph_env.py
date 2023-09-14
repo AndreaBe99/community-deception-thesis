@@ -173,16 +173,6 @@ class GraphEnvironment(object):
         that contains the target node, if this community satisfies the deception
         constraint, the episode is finished, otherwise not.
         
-        Example of the deception constraint: 
-            k = min(|C|-1, |C'|-1), t = |C \ C' \ node| / k
-            with C = {t,u,v,w}, node = {u} 
-                1. C' = {a,b,c,u},  C \ C' = {u},       k = 3,  t = 0/3
-                2. C' = {t,u,v,w},  C \ C' = {t,u,v,w}, k = 3,  t = 3/3
-                3. C' = {t,u,v},    C \ C' = {t,u,v},   k = 2,  t = 2/2
-                4. C' = {t,u,v,z},  C \ C' = {t,u,v},   k = 3,  t = 2/3
-                5. C' = {t,u,z},    C \ C' = {t,u},     k = 2,  t = 1/2
-                6. C' = {t,u,z,c},  C \ C' = {t,u},     k = 3,  t = 1/3
-        
         Returns
         -------
         reward : float

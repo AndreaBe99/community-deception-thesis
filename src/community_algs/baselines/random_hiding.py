@@ -1,6 +1,7 @@
-import sys
-sys.path.append("../../../")
-from src.utils.utils import DetectionAlgorithmsNames
+# import sys
+# sys.path.append("../../../")
+from src.environment.graph_env import GraphEnvironment
+from src.utils.utils import DetectionAlgorithmsNames, Utils
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
 
 import networkx as nx
@@ -12,18 +13,20 @@ class RandomHiding():
     
     def __init__(
         self, 
-        graph: nx.Graph, 
+        env: GraphEnvironment, 
         steps: int, 
-        target_node: int, 
-        target_community: List[int],
-        detection_alg: str = DetectionAlgorithmsNames.INF.value):
-        self.graph = graph
+        target_community: List[int]):
+        self.env = env
+        self.graph = self.env.original_graph
         self.steps = steps
-        self.target_node = target_node
+        self.target_node = self.env.node_target
         self.target_community = target_community
-        self.detection_alg = CommunityDetectionAlgorithm(detection_alg)
-        self.original_community = self.detection_alg.compute_community(graph)
-        self.possible_edges = self.get_possible_edges()
+        self.detection_alg = self.env.detection
+        self.original_community_structure = self.env.original_community_structure
+        self.possible_edges = self.env.possible_actions
+        # Put all the edges in a list
+        self.possible_edges = list(self.possible_edges["ADD"]) + list(self.possible_edges["REMOVE"])
+        
 
     def hide_target_node_from_community(self)->tuple:
         """
@@ -48,81 +51,19 @@ class RandomHiding():
             
             # Compute the new community structure
             communities = self.detection_alg.compute_community(graph)
-            idx = self.get_community_target_idx(communities.communities, self.target_community)
-            
-            if self.target_node in communities.communities[idx]:
-                if set(communities.communities[idx]).issuperset(set(self.target_community)):
-                    # If the target community is a subset of the new community, the episode is finished
-                    done = True
-            if self.target_node not in communities.communities[idx]:
-                # If the target node is not in the target community, the episode is finished
+            new_community = Utils.get_new_community(
+                self.target_node, communities)
+
+            check = Utils.check_goal(
+                self.env, self.target_node, self.target_community, new_community)
+            if check == 1:
+                # If the target community is a subset of the new community, the episode is finished
                 done = True
+            self.steps -= 1
             
             self.steps -= 1
         return graph, communities
         
-    def get_possible_edges(self)->set:
-        """
-        Returns all the possible actions that can be applied to the graph
-        given a source node(self.node_target). The possible actions are:
-            - Add an edge between the source node and a node outside the community
-            - Remove an edge between the source node and a node inside the community
-
-        Returns
-        -------
-        possible_edges: set
-            Set of possible edges that can be added or removed from the graph 
-        """
-        possible_edges = set()
-        
-        def in_community(node):
-            return node in self.target_community
-        def out_community(node):
-            return node not in self.target_community
-        
-        u = self.target_node
-        for v in self.graph.nodes():
-            if v == u:
-                continue
-            if in_community(u) and in_community(v):
-                if self.graph.has_edge(u, v):
-                    possible_edges.add((u, v))
-            elif (in_community(u) and out_community(v)) \
-                or (out_community(u) and in_community(v)):
-                if not self.graph.has_edge(u, v):
-                    possible_edges.add((u, v))
-        return possible_edges
-
-
-    def get_community_target_idx(
-        self,
-        community_structure: List[List[int]],
-        community_target: List[int]) -> int:
-        """
-        Returns the index of the target community in the list of communities.
-        As the target community after a rewiring action we consider the community
-        with the highest number of nodes equal to the initial community.
-
-        Parameters
-        ----------
-        community_structure : List[List[int]]
-            List of communities
-        community_target : List[int]
-            Community of node we want to remove from it
-
-        Returns
-        -------
-        max_list_idx : int
-            Index of the target community in the list of communities
-        """
-        max_count = 0
-        max_list_idx = 0
-        for i, lst in enumerate(community_structure):
-            count = sum(1 for x in lst if x in community_target)
-            if count > max_count:
-                max_count = count
-                max_list_idx = i
-        return max_list_idx
 
 
 # Example usage:

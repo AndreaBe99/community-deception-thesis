@@ -92,16 +92,7 @@ class RoamHiding():
 
 
 
-def get_community_target(community_structure, community_target):
-    max_count = 0
-    max_list_idx = 0
-    for i, lst in enumerate(community_structure):
-        count = sum(1 for x in lst if x in community_target)
-        if count > max_count:
-            max_count = count
-            max_list_idx = i
-    return max_list_idx
-    
+
 if __name__ == "__main__":
     print("*"*20, "Setup Information", "*"*20)
 
@@ -150,7 +141,7 @@ if __name__ == "__main__":
     sf_graph = graph.copy()
     
     # Apply Hide and Seek
-    deception = DisguisingIndividuals(hs_graph, node_target)
+    deception = RoamHiding(hs_graph, node_target)
     hs_graph = deception.roam_heuristic(edge_budget)
     
     # Node Hiding with safeness
@@ -164,9 +155,9 @@ if __name__ == "__main__":
     print("* Communities After Safeness:\n", nee_cs_sf.communities)
     
     # Index of the community target after deception
-    idx_ct_hs = get_community_target(new_cs_hs.communities, community_target)
+    idx_ct_hs = Utils.get_community_target(node_target, new_cs_hs.communities)
     print("* Community Target After Hide and Seek:\n", new_cs_hs.communities[idx_ct_hs])
-    idx_ct_sf = get_community_target(nee_cs_sf.communities, community_target)
+    idx_ct_sf = Utils.get_community_target(node_target, nee_cs_sf.communities)
     print("* Community Target After Safeness:\n", nee_cs_sf.communities[idx_ct_sf])
 
     

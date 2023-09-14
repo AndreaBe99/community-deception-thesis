@@ -1,6 +1,7 @@
-from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
+from src.utils.utils import HyperParams, Utils, FilePaths
 from src.environment.graph_env import GraphEnvironment
 from src.agent.agent import Agent
+
 
 from src.community_algs.baselines.random_hiding import RandomHiding
 from src.community_algs.baselines.degree_hiding import DegreeHiding
@@ -9,6 +10,47 @@ from src.community_algs.baselines.roam_hiding import RoamHiding
 from tqdm import trange
 import time
 
+
+def check_goal(
+    env: GraphEnvironment,
+    node_target: int, 
+    old_community: int, 
+    new_community: int) -> int:
+    """
+    Check if the goal of hiding the target node was achieved
+
+    Parameters
+    ----------
+    env : GraphEnvironment
+        Environment of the agent
+    node_target : int
+        Target node
+    old_community : int
+        Original community of the target node
+    new_community : int
+        New community of the target node
+    similarity_function : Callable
+        Similarity function to use
+        
+    Returns
+    -------
+    int
+        1 if the goal was achieved, 0 otherwise
+    """
+    # Copy the communities to avoid modifying the original ones
+    new_community_copy = new_community.copy()
+    new_community_copy.remove(node_target)
+    old_community_copy = old_community.copy()
+    old_community_copy.remove(node_target)
+    # Compute the similarity between the new and the old community
+    similarity = env.community_similarity(
+        new_community_copy,
+        old_community_copy
+    )
+    del new_community_copy, old_community_copy
+    if similarity <= env.tau:
+        return 1
+    return 0
 
 
 def test(
@@ -78,7 +120,7 @@ def test(
         agent_nmi = community_structure.normalized_mutual_information(
             agent.env.new_community_structure).score
         # Check if the goal of hiding the target node was achieved
-        agent_goal = Utils.check_goal(node_target, community_target, agent_community)
+        agent_goal = check_goal(agent.env, node_target, community_target, agent_community)
         # Save the metrics
         log_dict = Utils.save_metrics(
             log_dict, "agent", agent_goal, agent_nmi, end, agent.step)
@@ -103,7 +145,7 @@ def test(
         rh_nmi = community_structure.normalized_mutual_information(
             rh_communities).score
         # Check if the goal of hiding the target node was achieved
-        rh_goal = Utils.check_goal(node_target, community_target, rh_community)
+        rh_goal = check_goal(agent.env, node_target, community_target, rh_community)
         # Save the metrics
         log_dict = Utils.save_metrics(
             log_dict, "rh", rh_goal, rh_nmi, end, agent.env.edge_budget-random_hiding.steps)
@@ -126,7 +168,7 @@ def test(
         dh_nmi = community_structure.normalized_mutual_information(
             dh_communities).score
         # Check if the goal of hiding the target node was achieved
-        dh_goal = Utils.check_goal(node_target, community_target, dh_community)
+        dh_goal = check_goal(agent.env, node_target, community_target, dh_community)
         # Save the metrics
         log_dict = Utils.save_metrics(
             log_dict, "dh", dh_goal, dh_nmi, end, agent.env.edge_budget-degree_hiding.steps)
@@ -146,7 +188,7 @@ def test(
         di_nmi = community_structure.normalized_mutual_information(
             di_communities).score
         # Check if the goal of hiding the target node was achieved
-        di_goal = Utils.check_goal(node_target, community_target, di_community)
+        di_goal = check_goal(agent.env, node_target, community_target, di_community)
         # Save the metrics
         log_dict = Utils.save_metrics(
             log_dict, "di", di_goal, di_nmi, end, agent.env.edge_budget)

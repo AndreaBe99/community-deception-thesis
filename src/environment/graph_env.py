@@ -15,15 +15,15 @@ class GraphEnvironment(object):
     """Enviroment where the agent will act, it will be a graph with a community"""
 
     def __init__(
-            self, 
-            graph: nx.Graph, 
+            self,
+            graph: nx.Graph,
             env_name: str,
             community_detection_algorithm: str,
             beta: float = HyperParams.BETA.value,
             tau: float = HyperParams.TAU.value,
             community_similarity_function: str = SimilarityFunctionsNames.SOR.value,
             graph_similarity_function: str = SimilarityFunctionsNames.JAC_1.value,
-            ) -> None:
+    ) -> None:
         """Constructor for Graph Environment
         Parameters
         ----------
@@ -40,7 +40,7 @@ class GraphEnvironment(object):
             we have a soft constraint, hard constraint otherwise, by default
             HyperParams.T.value
         community_similarity_function : str, optional
-            Name of the community similarity function to use, by default 
+            Name of the community similarity function to use, by default
             SimilarityFunctionsNames.SOR.value
         graph_similarity_function : str, optional
             Name of the graph similarity function to use, by default
@@ -55,7 +55,7 @@ class GraphEnvironment(object):
         self.old_graph = None
         # Get the Number of connected components
         self.n_connected_components = nx.number_connected_components(graph)
-        
+
         # ° ---- HYPERPARAMETERS ---- ° #
         assert beta >= 0 and beta <= 100, "Beta must be between 0 and 100"
         assert tau >= 0 and tau <= 1, "T value must be between 0 and 1"
@@ -63,39 +63,44 @@ class GraphEnvironment(object):
         self.beta = beta
         self.tau = tau
         # Weights for the reward and the penalty
-        self.lambda_metric = None # lambda_metric
-        self.alpha_metric = None # alpha_metric
-        
+        self.lambda_metric = None  # lambda_metric
+        self.alpha_metric = None  # alpha_metric
+
         # ° ---- SIMILARITY FUNCTIONS ---- ° #
         # Select the similarity function to use to compare the communities
         self.community_similarity = CommunitySimilarity(
             community_similarity_function).select_similarity_function()
         self.graph_similarity = GraphSimilarity(
             graph_similarity_function).select_similarity_function()
-        
+
         # ° ---- COMMUNITY DETECTION ---- ° #
         # Name of the environment and the community detection algorithm
         self.env_name = env_name
         self.detection_alg = community_detection_algorithm
         # Community Algorithms objects
-        self.detection = CommunityDetectionAlgorithm(community_detection_algorithm)
+        self.detection = CommunityDetectionAlgorithm(
+            community_detection_algorithm)
         # Metrics
         self.old_penalty_value = 0
         # Compute the community structure of the graph, before the action,
         # i.e. before the deception
-        self.original_community_structure = self.detection.compute_community(graph)
+        self.original_community_structure = self.detection.compute_community(
+            graph)
         # ! It is a NodeClustering object
         self.old_community_structure = self.original_community_structure
         self.new_community_structure = None
 
         # ° ---- COMMUNITY DECEPTION ---- ° #
-        # Choose one of the communities found by the algorithm, as initial 
+        # Choose one of the communities found by the algorithm, as initial
         # community we choose the community with the highest number of nodes
         self.community_target = max(
             self.original_community_structure.communities, key=len)
+        if len(self.community_target) <= 1:
+            raise Exception("Community target must have at least two node.")
+
         # Choose a node randomly from the community, as initial node to remove
         self.node_target = random.choice(self.community_target)
-        
+
         # ° ---- REWIRING STEP ---- ° #
         # Compute the edge budget for the graph
         self.edge_budget = self.get_edge_budget()
@@ -103,7 +108,7 @@ class GraphEnvironment(object):
         self.used_edge_budget = 0
         # Max Rewiring Steps during an episode, set a limit to avoid infinite episodes
         # in case the agent does not find the target node
-        self.max_steps = self.graph.number_of_edges()#*2
+        self.max_steps = self.graph.number_of_edges()  # *2
         # Whether the budget for the graph rewiring is exhausted, or the target
         # node does not belong to the community anymore
         self.stop_episode = False
@@ -114,15 +119,15 @@ class GraphEnvironment(object):
         self.possible_actions = self.get_possible_actions()
         # Length of the list of possible actions to add
         self.len_add_actions = len(self.possible_actions["ADD"])
-        
+
         # ° ---- PRINT ENVIRONMENT INFO ---- ° #
         # Print the environment information
         self.print_env_info()
 
-
     ############################################################################
     #                       GETTERS FUNCTIONS                                  #
     ############################################################################
+
     def get_edge_budget(self) -> int:
         """
         Computes the edge budget for each graph
@@ -133,11 +138,11 @@ class GraphEnvironment(object):
             Edge budgets of the graph
         """
         return int(math.ceil((self.graph.number_of_edges() * self.beta / 100)))
-    
+
     def get_penalty(self) -> float:
         """
         Compute the metrics and return the penalty to subtract from the reward
-        
+
         Returns
         -------
         penalty: float
@@ -150,13 +155,14 @@ class GraphEnvironment(object):
         # 0 means that they are completely different
         # We want to maximize the NMI, so we subtract it from 1
         community_distance = 1 - community_distance
-        
+
         # ° ---- GRAPH DISTANCE ---- ° #
         graph_distance = self.graph_similarity(self.graph, self.old_graph)
-        
+
         # ° ---- PENALTY ---- ° #
         assert self.alpha_metric is not None, "Alpha metric is None, must be set in grid search"
-        penalty = self.alpha_metric * community_distance + (1 - self.alpha_metric) * graph_distance
+        penalty = self.alpha_metric * community_distance + \
+            (1 - self.alpha_metric) * graph_distance
         # Subtract the metric value of the previous step
         penalty -= self.old_penalty_value
         # Update with the new values
@@ -168,11 +174,11 @@ class GraphEnvironment(object):
         Computes the reward for the agent, it is a 0-1 value function, if the
         target node still belongs to the community, the reward is 0 minus the
         penalty, otherwise the reward is 1 minus the penalty.
-        
+
         As new community target after the action, we consider the community
         that contains the target node, if this community satisfies the deception
         constraint, the episode is finished, otherwise not.
-        
+
         Returns
         -------
         reward : float
@@ -182,7 +188,7 @@ class GraphEnvironment(object):
             to the community anymore, the episode is finished
         """
         assert self.lambda_metric is not None, "Lambda metric is None, must be set in grid search"
-        # Get the target community in the new community structure that 
+        # Get the target community in the new community structure that
         # contains the target node
         for community in self.new_community_structure.communities:
             if self.node_target in community:
@@ -192,7 +198,7 @@ class GraphEnvironment(object):
         # ° ---------- PENALTY ---------- ° #
         # Compute the metric to subtract from the reward
         penalty = self.get_penalty()
-        # If the target node does not belong to the community anymore, 
+        # If the target node does not belong to the community anymore,
         # the episode is finished
         if len(new_community_target) == 1:
             reward = 1 - (self.lambda_metric * penalty)
@@ -218,7 +224,6 @@ class GraphEnvironment(object):
             return reward, True
         reward = -self.lambda_metric * penalty
         return reward, False
-    
 
     def get_possible_actions(self) -> dict:
         """
@@ -226,7 +231,7 @@ class GraphEnvironment(object):
         given a source node (self.node_target). The possible actions are:
             - Add an edge between the source node and a node outside the community
             - Remove an edge between the source node and a node inside the community
-        
+
         Returns
         -------
         self.possible_actions : dict
@@ -260,11 +265,11 @@ class GraphEnvironment(object):
                     if (v, u) not in possible_actions["ADD"]:
                         possible_actions["ADD"].add((u, v))
         return possible_actions
-    
-    
+
     ############################################################################
     #                       EPISODE RESET FUNCTIONS                            #
     ############################################################################
+
     def reset(self) -> Data:
         """
         Reset the environment
@@ -285,8 +290,8 @@ class GraphEnvironment(object):
         self.change_target_community()
         self.possible_actions = self.get_possible_actions()
         return self.graph
-    
-    def change_target_node(self, node_target: int=None) -> None:
+
+    def change_target_node(self, node_target: int = None) -> None:
         """
         Change the target node to remove from the community
 
@@ -303,11 +308,11 @@ class GraphEnvironment(object):
                 self.node_target = random.choice(self.community_target)
         else:
             self.node_target = node_target
-    
+
     def change_target_community(
-        self, 
-        community: List[int] = None, 
-        node_target: int = None) -> None:
+            self,
+            community: List[int] = None,
+            node_target: int = None) -> None:
         """
         Change the target community from which we want to hide the node
 
@@ -320,29 +325,35 @@ class GraphEnvironment(object):
         """
         if community is None:
             # Select randomly a new community target different from the last one
-            old_community = self.community_target
-            while self.community_target == old_community:
+            old_community = self.community_target.copy()
+            done = False
+            while not done:
                 random.seed(time.time())
                 self.community_target = random.choice(
                     self.original_community_structure.communities)
+                # Check condition on new community
+                if len(self.community_target) > 1 and \
+                        self.community_target != old_community:
+                    done = True
+            del old_community
         else:
             self.community_target = community
         # Change the target node to remove from the community
         self.change_target_node(node_target=node_target)
-    
+
     ############################################################################
     #                      EPISODE STEP FUNCTIONS                              #
     ############################################################################
     def step(self, action: int) -> Tuple[nx.Graph, float, bool]:
         """
         Step function for the environment
-        
+
         Parameters
         ----------
         action : int
             Integer representing a node in the graph, it will be the destination
             node of the rewiring action (out source node is always the target node).
-            
+
         Returns
         -------
         self.graph : nx.Graph
@@ -365,18 +376,19 @@ class GraphEnvironment(object):
             # The state is the same as before
             # return self.data_pyg, self.rewards, self.stop_episode
             return self.graph, self.rewards, self.stop_episode
-        
+
         # ° ---- COMMUNITY DETECTION ---- ° #
         # Compute the community structure of the graph after the action
-        self.new_community_structure = self.detection.compute_community(self.graph)
-        
+        self.new_community_structure = self.detection.compute_community(
+            self.graph)
+
         # ° ---- REWARD ---- ° #
         self.rewards, done = self.get_reward()
-        # If the target node does not belong to the community anymore, 
+        # If the target node does not belong to the community anymore,
         # the episode is finished
         if done:
             self.stop_episode = True
-        
+
         # ° ---- BUDGET ---- ° #
         # Compute used budget
         self.used_edge_budget += budget_consumed
@@ -387,13 +399,13 @@ class GraphEnvironment(object):
             # the community, the reward is negative
             if not done:
                 self.rewards = -1
-        
+
         self.old_community_structure = self.new_community_structure
         return self.graph, self.rewards, self.stop_episode
-    
+
     def apply_action(self, action: int) -> int:
         """
-        Applies the action to the graph, if there is an edge between the two 
+        Applies the action to the graph, if there is an edge between the two
         nodes, it removes it, otherwise it adds it
 
         Parameters
@@ -401,13 +413,13 @@ class GraphEnvironment(object):
         action : int
             Integer representing a node in the graph, it will be the destination
             node of the rewiring action (out source node is always the target node).
-        
+
         Returns
         -------
         budget_consumed : int
             Amount of budget consumed, 1 if the action has been applied, 0 otherwise
         """
-        action = (self.node_target, action)   
+        action = (self.node_target, action)
         # We need to take into account both the actions (u,v) and (v,u)
         action_reversed = (action[1], action[0])
         if action in self.possible_actions["ADD"]:
@@ -435,11 +447,11 @@ class GraphEnvironment(object):
         """Print the environment information"""
         print("* Community Detection Algorithm:", self.detection_alg)
         print("* Number of communities found:",
-            len(self.original_community_structure.communities))
+              len(self.original_community_structure.communities))
         print("* Initial Community Target:", self.community_target)
         print("* Initial Nodes Target:", self.node_target)
         print("* Number of possible actions:",
-            len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"]))
+              len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"]))
         print("* Rewiring Budget:", self.edge_budget, "=",
-            self.beta, "*", self.graph.number_of_edges(), "/ 100",)
+              self.beta, "*", self.graph.number_of_edges(), "/ 100",)
         print("*", "-"*58, "\n")

@@ -1,7 +1,7 @@
 """Module for community detection algorithms"""
 # import sys
 # sys.path.append('../../')
-from src.utils.utils import DetectionAlgorithms
+from src.utils.utils import DetectionAlgorithmsNames
 from typing import List
 
 from cdlib import algorithms
@@ -41,7 +41,7 @@ class CommunityDetectionAlgorithm(object):
             Cdlib NodeClustering object
         """
         # Rename DetectionAlgorithms Enum to da for convenience
-        da = DetectionAlgorithms
+        da = DetectionAlgorithmsNames
         # Choose the algorithm
         if self.alg_name == da.LOUV.value:
             return algorithms.louvain(graph)
@@ -121,7 +121,7 @@ class DetectionAlgorithm(object):
         graph = self.networkx_to_igraph(graph)
 
         # Rename DetectionAlgorithms Enum to da for convenience
-        da = DetectionAlgorithms
+        da = DetectionAlgorithmsNames
         # Choose the algorithm
         if self.alg_name == da.LOUV.value:
             return self.compute_louv(graph, args)
@@ -451,7 +451,7 @@ if __name__ == "__main__":
     # Create a graph
     g = nx.karate_club_graph()
     # Create an instance of the class, and choose the algorithm
-    alg = DetectionAlgorithm(DetectionAlgorithms.WALK.value)
+    alg = DetectionAlgorithm(DetectionAlgorithmsNames.WALK.value)
     # Compute the communities
     comms = alg.compute_community(g)
     # Print the communities

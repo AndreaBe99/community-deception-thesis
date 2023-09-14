@@ -1,6 +1,6 @@
 import sys
 sys.path.append("../../../")
-from src.utils.utils import DetectionAlgorithms
+from src.utils.utils import DetectionAlgorithmsNames
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
 
 import networkx as nx
@@ -17,7 +17,7 @@ class DegreeHiding():
             steps: int,
             target_node: int,
             target_community: List[int],
-            detetion_alg: str = DetectionAlgorithms.INF.value):
+            detetion_alg: str = DetectionAlgorithmsNames.INF.value):
         self.graph = graph
         self.steps = steps
         self.target_node = target_node
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     # Import karate club graph
     graph = nx.karate_club_graph()
 
-    detection_alg_name = DetectionAlgorithms.INF.value
+    detection_alg_name = DetectionAlgorithmsNames.INF.value
     detection_alg = CommunityDetectionAlgorithm(detection_alg_name)
     communities = detection_alg.compute_community(graph)
 

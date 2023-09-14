@@ -2,7 +2,7 @@ import sys
 sys.path.append("../../../")
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
 from src.community_algs.metrics.safeness import Safeness
-from src.utils.utils import Utils, FilePaths, DetectionAlgorithms, HyperParams
+from src.utils.utils import Utils, FilePaths, DetectionAlgorithmsNames, HyperParams
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     print("*", graph)
     
     # ° ------ Community Setup ------ ° #
-    detection_alg = DetectionAlgorithms.WALK.value
+    detection_alg = DetectionAlgorithmsNames.WALK.value
     print("* Community Detection Algorithm:", detection_alg)
     # Apply the community detection algorithm on the graph
     dct = CommunityDetectionAlgorithm(detection_alg)

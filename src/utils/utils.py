@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import List, Tuple
+# from src.environment.graph_env import GraphEnvironment
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -51,7 +53,7 @@ class HyperParams(Enum):
     # Weight to balance the penalty in the reward
     LAMBDA = [0.1] # [0.01, 0.1, 1]
     # Weight to balance the two metrics in the definition of the penalty
-    ALPHA = [0.1] # [0.3, 0.5, 0.7]
+    ALPHA = [0.3] # [0.3, 0.5, 0.7]
     
     """ Graph Encoder Parameters """""
     EMBEDDING_DIM = 128 # 256
@@ -71,7 +73,7 @@ class HyperParams(Enum):
 
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 5 #1000
+    MAX_EPISODES = 10#00
     # Dictonary for logging
     LOG_DICT = {
         'train_reward': [],
@@ -91,7 +93,7 @@ class HyperParams(Enum):
     LR_EVAL = 1e-3
     GAMMA_EVAL = 0.3
     LAMBDA_EVAL = 0.1
-    ALPHA_EVAL = 0.1
+    ALPHA_EVAL = 0.3
     STEPS_EVAL = 10#00
     EVAL_DICT = {
         "agent": {
@@ -362,6 +364,78 @@ class Utils:
     ############################################################################
     #                               EVALUATION                                 #
     ############################################################################   
+    @staticmethod   
+    def get_new_community(
+        node_target: int,
+        new_community_structure: List[List[int]]) -> List[int]:
+        """
+        Search the community target in the new community structure after 
+        deception. As new community target after the action, we consider the 
+        community that contains the target node, if this community satisfies 
+        the deception constraint, the episode is finished, otherwise not.
+
+        Parameters
+        ----------
+        node_target : int
+            Target node to be hidden from the community
+        new_community_structure : List[List[int]]
+            New community structure after deception
+
+        Returns
+        -------
+        List[int]
+            New community target after deception
+        """
+        for community in new_community_structure.communities:
+            if node_target in community:
+                return community
+        raise ValueError("Community not found")
+    
+    @staticmethod
+    def check_goal(
+            env,#: GraphEnvironment,
+            node_target: int,
+            old_community: int,
+            new_community: int) -> int:
+        """
+        Check if the goal of hiding the target node was achieved
+
+        Parameters
+        ----------
+        env : GraphEnvironment
+            Environment of the agent
+        node_target : int
+            Target node
+        old_community : int
+            Original community of the target node
+        new_community : int
+            New community of the target node
+        similarity_function : Callable
+            Similarity function to use
+            
+        Returns
+        -------
+        int
+            1 if the goal was achieved, 0 otherwise
+        """
+        if len(new_community) == 1:
+            return 1
+        # Copy the communities to avoid modifying the original ones
+        new_community_copy = new_community.copy()
+        new_community_copy.remove(node_target)
+        old_community_copy = old_community.copy()
+        old_community_copy.remove(node_target)
+        # Compute the similarity between the new and the old community
+        similarity = env.community_similarity(
+            new_community_copy,
+            old_community_copy
+        )
+        del new_community_copy, old_community_copy
+        if similarity <= env.tau:
+            return 1
+        return 0
+
+    
     @staticmethod
     def save_test(log: dict, files_path: str):
         """Save and Plot the testing results

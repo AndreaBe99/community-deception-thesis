@@ -51,9 +51,9 @@ class CommunityDetectionAlgorithm(object):
             return algorithms.greedy_modularity(graph)
         elif self.alg_name == da.INF.value:
             return algorithms.infomap(graph)
-        # elif self.alg_name == da.LAB.value:
-        #    # ! Return a EdgeClustering object
-        #    return algorithms.label_propagation(graph)
+        elif self.alg_name == da.LAB.value:
+            # ! Return a EdgeClustering object
+            return algorithms.label_propagation(graph)
         elif self.alg_name == da.EIG.value:
             return algorithms.eigenvector(graph)
         # elif self.alg_name == da.BTW.value:

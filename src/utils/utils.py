@@ -46,7 +46,7 @@ class HyperParams(Enum):
     BETA = 10
     # Strength of the deception constraint, value between 0 and 1, 
     # with 1 soft constraint, 0 hard constraint
-    T = 0.5
+    TAU = 0.5
     # ° Hyperparameters  Testing ° #
     # Weight to balance the penalty in the reward
     LAMBDA = [0.1] # [0.01, 0.1, 1]
@@ -134,7 +134,7 @@ class HyperParams(Enum):
     SEED= 10
 
 
-class DetectionAlgorithms(Enum):
+class DetectionAlgorithmsNames(Enum):
     """
     Enum class for the detection algorithms
     """
@@ -148,6 +148,21 @@ class DetectionAlgorithms(Enum):
     SPIN = "spinglass"
     OPT = "optimal"
     SCD = "scalable_community_detection"
+
+
+class SimilarityFunctionsNames(Enum):
+    """
+    Enum class for the similarity functions
+    """
+    # Community similarity functions
+    JAC = "jaccard"
+    OVE = "overlap"
+    SOR = "sorensen"
+    # Graph similarity functions
+    GED = "ged" # Graph edit distance
+    JAC_1 = "jaccard_1"
+    JAC_2 = "jaccard_2"
+    
 
 
 class Utils:
@@ -343,7 +358,7 @@ class Utils:
             file_path+"/training_rolling_loss.png",
         )
         
-    
+        
     ############################################################################
     #                               EVALUATION                                 #
     ############################################################################

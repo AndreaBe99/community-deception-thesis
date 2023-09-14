@@ -1,8 +1,9 @@
 """Module for the GraphEnviroment class"""
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
-from src.utils.utils import HyperParams
+from src.utils.utils import HyperParams, SimilarityFunctionsNames
+from src.utils.similarity import CommunitySimilarity, GraphSimilarity
 from torch_geometric.data import Data
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import math
 import networkx as nx
@@ -19,7 +20,10 @@ class GraphEnvironment(object):
             env_name: str,
             community_detection_algorithm: str,
             beta: float = HyperParams.BETA.value,
-            t_value: float = HyperParams.T.value) -> None:
+            tau: float = HyperParams.TAU.value,
+            community_similarity_function: str = SimilarityFunctionsNames.SOR.value,
+            graph_similarity_function: str = SimilarityFunctionsNames.JAC_1.value,
+            ) -> None:
         """Constructor for Graph Environment
         Parameters
         ----------
@@ -31,10 +35,16 @@ class GraphEnvironment(object):
             Name of the community detection algorithm to use
         beta : float, optional
             Percentage of edges to remove, by default HyperParams.BETA.value
-        t_value : float, optional
+        tau : float, optional
             Strength of the deception constraint, value between 0 and 1, with 1
             we have a soft constraint, hard constraint otherwise, by default
             HyperParams.T.value
+        community_similarity_function : str, optional
+            Name of the community similarity function to use, by default 
+            SimilarityFunctionsNames.SOR.value
+        graph_similarity_function : str, optional
+            Name of the graph similarity function to use, by default
+            SimilarityFunctionsNames.JAC_1.value
         """
         random.seed(time.time())
         # ° ---- GRAPH ---- ° #
@@ -48,13 +58,20 @@ class GraphEnvironment(object):
         
         # ° ---- HYPERPARAMETERS ---- ° #
         assert beta >= 0 and beta <= 100, "Beta must be between 0 and 100"
-        assert t_value >= 0 and t_value <= 1, "T value must be between 0 and 1"
+        assert tau >= 0 and tau <= 1, "T value must be between 0 and 1"
         # Percentage of edges to remove
         self.beta = beta
-        self.t_value = t_value
+        self.tau = tau
         # Weights for the reward and the penalty
         self.lambda_metric = None # lambda_metric
         self.alpha_metric = None # alpha_metric
+        
+        # ° ---- SIMILARITY FUNCTIONS ---- ° #
+        # Select the similarity function to use to compare the communities
+        self.community_similarity = CommunitySimilarity(
+            community_similarity_function).select_similarity_function()
+        self.graph_similarity = GraphSimilarity(
+            graph_similarity_function).select_similarity_function()
         
         # ° ---- COMMUNITY DETECTION ---- ° #
         # Name of the environment and the community detection algorithm
@@ -129,30 +146,13 @@ class GraphEnvironment(object):
         # ° ---- COMMUNITY DISTANCE ---- ° #
         community_distance = self.new_community_structure.normalized_mutual_information(
             self.old_community_structure).score
+        # In NMI 1 means that the two community structures are identical,
+        # 0 means that they are completely different
         # We want to maximize the NMI, so we subtract it from 1
         community_distance = 1 - community_distance
         
         # ° ---- GRAPH DISTANCE ---- ° #
-        # GRAPH EDIT DISTANCE
-        # graph_distance = nx.graph_edit_distance(self.graph, self.old_graph)
-        # Faster approximation of the graph edit distance
-        # graph_distance = next(nx.optimize_graph_edit_distance(self.graph, self.old_graph))
-
-        # Normalize the graph edit distance using a null graph:
-        #   GED(G1,G2)/[GED(G1,G0) + GED(G2,G0)]
-        # with G0 = null graph
-        # g_dist_1 = next(nx.optimize_graph_edit_distance(self.graph, nx.null_graph()))
-        # g_dist_2 = next(nx.optimize_graph_edit_distance(self.old_graph, nx.null_graph()))
-        # graph_distance /= (g_dist_1 + g_dist_2)
-        
-        # JACCARD SIMILARITY
-        def jaccard_similarity(g: nx.Graph, h: nx.Graph) -> float:
-            """Compute the Jaccard Similarity between two graphs"""
-            i = set(g).intersection(h)
-            return round(len(i) / (len(g) + len(h) - len(i)), 3)
-        graph_distance = jaccard_similarity(self.graph.edges(), self.old_graph.edges())
-        # We want to maximize the Jaccard Similarity, so we subtract it from 1
-        graph_distance = 1 - graph_distance
+        graph_distance = self.graph_similarity(self.graph, self.old_graph)
         
         # ° ---- PENALTY ---- ° #
         assert self.alpha_metric is not None, "Alpha metric is None, must be set in grid search"
@@ -198,26 +198,34 @@ class GraphEnvironment(object):
             if self.node_target in community:
                 new_community_target = community
                 break
+        assert new_community_target is not None, "New community target is None"
+        # ° ---------- PENALTY ---------- ° #
         # Compute the metric to subtract from the reward
         penalty = self.get_penalty()
+        # If the target node does not belong to the community anymore, 
+        # the episode is finished
         if len(new_community_target) == 1:
-            # The target node does not belong to any community anymore, the episode is finished
             reward = 1 - (self.lambda_metric * penalty)
             return reward, True
-        # Compute the intersection between the two communities
-        intersection = set(new_community_target).intersection(set(self.community_target))
-        # Subtract node target from the intersection
-        intersection.remove(self.node_target)
-        # Compute the t value
-        k = min(len(new_community_target)-1, len(self.community_target)-1)
-        assert k > 0, "k must be greater than 0"
-        t = len(intersection) / k
-        # Compare the t value with the threshold
-        if t <= self.t_value:
+        # ° ---- COMMUNITY SIMILARITY ---- ° #
+        # Remove target node from the communities, but first copy the lists
+        # to avoid modifying them
+        new_community_target_copy = new_community_target.copy()
+        new_community_target_copy.remove(self.node_target)
+        community_target_copy = self.community_target.copy()
+        community_target_copy.remove(self.node_target)
+        # Compute the similarity between the new communities
+        community_similarity = self.community_similarity(
+            new_community_target_copy,
+            community_target_copy,
+        )
+        # Delete the copies
+        del new_community_target_copy, community_target_copy
+        # ° ---------- REWARD ---------- ° #
+        if community_similarity <= self.tau:
             # We have reached the deception constraint, the episode is finished
             reward = 1 - (self.lambda_metric * penalty)
             return reward, True
-        # The episode is not finished, the constraint is not reached
         reward = -self.lambda_metric * penalty
         return reward, False
     

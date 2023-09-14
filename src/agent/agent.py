@@ -454,7 +454,7 @@ class Agent:
         """
         log_dir = self.get_path()
         Utils.check_dir(log_dir)
-        file_name = f'{log_dir}/results.json'
+        file_name = f'{log_dir}/training_results.json'
         with open(file_name, "w", encoding="utf-8") as f:
             json.dump(log_dict, f, indent=4)
     

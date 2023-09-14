@@ -66,8 +66,7 @@ class ActorCritic(nn.Module):
             Tuple of concentration and value
         """
         # Compute embedding
-        state = torch.tensor(self.model.infer([graph]))
-        # state = state.to(self.device)
+        state = torch.tensor(self.model.infer([graph])).to(self.device)
         # Actor
         probs = self.actor(state)
         # Adds jitter to ensure numerical stability

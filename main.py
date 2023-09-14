@@ -1,4 +1,4 @@
-from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithms
+from src.utils.utils import HyperParams, Utils, FilePaths, DetectionAlgorithmsNames
 from src.environment.graph_env import GraphEnvironment
 from src.agent.agent import Agent
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     # ° ------ Graph Setup ------ ° #
     # ! REAL GRAPH Graph path (change the following line to change the graph)
-    graph_path = FilePaths.DOL.value
+    graph_path = FilePaths.KAR.value
     # Load the graph from the dataset folder
     graph = Utils.import_mtx_graph(graph_path)
     # ! SYNTHETIC GRAPH Graph path (change the following line to change the graph)
@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # ° --- Environment Setup --- ° #
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    detection_alg = DetectionAlgorithms.INF.value
+    detection_alg = DetectionAlgorithmsNames.INF.value
     # Define the environment
     env = GraphEnvironment(
         graph=graph,

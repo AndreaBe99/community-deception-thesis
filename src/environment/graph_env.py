@@ -2,7 +2,6 @@
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
 from src.utils.utils import HyperParams, SimilarityFunctionsNames, Utils
 from src.utils.similarity import CommunitySimilarity, GraphSimilarity
-from torch_geometric.data import Data
 from typing import List, Tuple, Callable
 
 import math
@@ -157,10 +156,8 @@ class GraphEnvironment(object):
         # 0 means that they are completely different
         # We want to maximize the NMI, so we subtract it from 1
         community_distance = 1 - community_distance
-
         # ° ---- GRAPH DISTANCE ---- ° #
         graph_distance = self.graph_similarity(self.graph, self.old_graph)
-
         # ° ---- PENALTY ---- ° #
         assert self.alpha_metric is not None, "Alpha metric is None, must be set in grid search"
         penalty = self.alpha_metric * community_distance + \
@@ -224,7 +221,7 @@ class GraphEnvironment(object):
             # We have reached the deception constraint, the episode is finished
             reward = 1 - (self.lambda_metric * penalty)
             return reward, True
-        reward = -self.lambda_metric * penalty
+        reward = 0 - (self.lambda_metric * penalty)
         return reward, False
 
     def get_possible_actions(self) -> dict:
@@ -272,14 +269,14 @@ class GraphEnvironment(object):
     #                       EPISODE RESET FUNCTIONS                            #
     ############################################################################
 
-    def reset(self) -> Data:
+    def reset(self) -> nx.Graph:
         """
         Reset the environment
 
         Returns
         -------
-        adj_matrix : torch.Tensor
-            Adjacency matrix of the graph
+        self.graph : nx.Graph
+            Graph state after the reset, i.e. the original graph
         """
         self.used_edge_budget = 0
         self.stop_episode = False
@@ -289,7 +286,6 @@ class GraphEnvironment(object):
         self.old_graph = None
         self.old_penalty_value = 0
         self.old_community_structure = self.original_community_structure
-        self.change_target_community()
         self.possible_actions = self.get_possible_actions()
         return self.graph
 
@@ -374,7 +370,7 @@ class GraphEnvironment(object):
         budget_consumed = self.apply_action(action)
         # Set a negative reward if the action has not been applied
         if budget_consumed == 0:
-            self.rewards = -2
+            self.rewards = -1
             # The state is the same as before
             # return self.data_pyg, self.rewards, self.stop_episode
             return self.graph, self.rewards, self.stop_episode
@@ -400,7 +396,7 @@ class GraphEnvironment(object):
             # If the budget is exhausted, and the target node still belongs to
             # the community, the reward is negative
             if not done:
-                self.rewards = -1
+                self.rewards = -2
 
         self.old_community_structure = self.new_community_structure
         return self.graph, self.rewards, self.stop_episode
@@ -453,10 +449,6 @@ class GraphEnvironment(object):
         print("* Community Detection Algorithm:", self.detection_alg)
         print("* Number of communities found:",
               len(self.original_community_structure.communities))
-        print("* Initial Community Target:", self.community_target)
-        print("* Initial Nodes Target:", self.node_target)
-        print("* Number of possible actions:",
-              len(self.possible_actions["ADD"]) + len(self.possible_actions["REMOVE"]))
         print("* Rewiring Budget:", self.edge_budget, "=",
               self.beta, "*", self.graph.number_of_edges(), "/ 100",)
         print("*", "-"*58, "\n")

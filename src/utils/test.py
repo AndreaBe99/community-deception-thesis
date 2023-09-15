@@ -56,6 +56,8 @@ def test(
     steps = trange(eval_steps, desc="Testing Episode")
     for step in steps:
         
+        # Change the target community and node at each episode
+        agent.env.change_target_community()
         # ° ------ Agent ------ ° #
         start = time.time()
         new_graph = agent.test(

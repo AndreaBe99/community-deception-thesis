@@ -23,31 +23,11 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    print("*"*20, "Setup Information", "*"*20)
-
-    # ° ------ Graph Setup ------ ° #
-    # ! REAL GRAPH Graph path (change the following line to change the graph)
-    graph_path = FilePaths.KAR.value
-    # Load the graph from the dataset folder
-    graph = Utils.import_mtx_graph(graph_path)
-    # ! SYNTHETIC GRAPH Graph path (change the following line to change the graph)
-    # graph, graph_path = Utils.generate_lfr_benchmark_graph()
-    # Set the environment name as the graph name
-    env_name = graph_path.split("/")[-1].split(".")[0]
-    # Print the number of nodes and edges
-    print("* Graph Name:", env_name)
-    print("*", graph)
-
+    # NOTE To modify the hyperparameters, dataset, detection algorithm, etc. 
+    # NOTE  please refer to the file src/utils/utils.py in the class HyperParams
     # ° --- Environment Setup --- ° #
-    # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    detection_alg = DetectionAlgorithmsNames.INF.value
-    # Define the environment
-    env = GraphEnvironment(
-        graph=graph,
-        env_name=env_name,
-        community_detection_algorithm=detection_alg)
-
-    # Define the agent
+    env = GraphEnvironment()
+    # ° ------ Agent Setup ----- ° #
     agent = Agent(env=env)
     # ° ------ TRAIN ------ ° #
     if args.mode == "train":

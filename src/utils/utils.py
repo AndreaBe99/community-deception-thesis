@@ -81,7 +81,7 @@ class HyperParams(Enum):
     # Numeber of possible action with BETA=30, is 30% of the edges
     BETA = 10
     # ! Strength of the deception constraint, value between 0 (hard) and 1 (soft) 
-    TAU = 0.5
+    TAU = 0.8
     # ° Hyperparameters  Testing ° #
     # ! Weight to balance the penalty in the reward
     # The higher its value the more importance the penalty will have
@@ -103,9 +103,9 @@ class HyperParams(Enum):
     BEST_REWARD = 0.7  # -np.inf
     # ° Hyperparameters  Testing ° #
     # ! Learning rate, it controls how fast the network learns
-    LR = [1e-7] # [1e-7, 1e-4, 1e-1]
+    LR = [1e-3] # [1e-7, 1e-4, 1e-1]
     # ! Discount factor
-    GAMMA = [0.9] # [0.9, 0.95]
+    GAMMA = [0.95] # [0.9, 0.95]
     
     """ Training Parameters """
     # Number of episodes to collect experience
@@ -127,11 +127,11 @@ class HyperParams(Enum):
     
     """Evaluation Parameters"""
     # ! Change the following parameters according to the hyperparameters to test
-    LR_EVAL = 1e-3
-    GAMMA_EVAL = 0.3
-    LAMBDA_EVAL = 0.1
-    ALPHA_EVAL = 0.3
     STEPS_EVAL = 10#00
+    LR_EVAL = LR[0]
+    GAMMA_EVAL = GAMMA[0]
+    LAMBDA_EVAL = LAMBDA[0]
+    ALPHA_EVAL = ALPHA[0]
     EVAL_DICT = {
         "agent": {
             "goal": [],

@@ -1,6 +1,6 @@
 """Module for the GraphEnviroment class"""
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
-from src.utils.utils import HyperParams, SimilarityFunctionsNames
+from src.utils.utils import HyperParams, SimilarityFunctionsNames, Utils
 from src.utils.similarity import CommunitySimilarity, GraphSimilarity
 from torch_geometric.data import Data
 from typing import List, Tuple, Callable
@@ -15,22 +15,19 @@ class GraphEnvironment(object):
     """Enviroment where the agent will act, it will be a graph with a community"""
 
     def __init__(
-            self,
-            graph: nx.Graph,
-            env_name: str,
-            community_detection_algorithm: str,
-            beta: float = HyperParams.BETA.value,
-            tau: float = HyperParams.TAU.value,
-            community_similarity_function: str = SimilarityFunctionsNames.SOR.value,
-            graph_similarity_function: str = SimilarityFunctionsNames.JAC_1.value,
+        self,
+        graph_path: str = HyperParams.GRAPH_NAME.value,
+        community_detection_algorithm: str = HyperParams.DETECTION_ALG_NAME.value,
+        beta: float = HyperParams.BETA.value,
+        tau: float = HyperParams.TAU.value,
+        community_similarity_function: str = SimilarityFunctionsNames.SOR.value,
+        graph_similarity_function: str = SimilarityFunctionsNames.JAC_1.value,
     ) -> None:
         """Constructor for Graph Environment
         Parameters
         ----------
-        graph : nx.Graph
-            Graph to use for the environment
-        env_name : str
-            Name of the environment, i.e. name of the dataset
+        graph_path : str, optional
+            Path of the graph to load, by default HyperParams.GRAPH_NAME.value
         community_detection_algorithm : str
             Name of the community detection algorithm to use
         beta : float, optional
@@ -48,13 +45,18 @@ class GraphEnvironment(object):
         """
         random.seed(time.time())
         # ° ---- GRAPH ---- ° #
-        self.graph = graph
+        # Load the graph from the dataset folder
+        if graph_path is None:
+            # Generate a synthetic graph
+            self.graph, graph_path = Utils.generate_lfr_benchmark_graph()
+        else:
+            self.graph = Utils.import_mtx_graph(graph_path)
         # Save the original graph to restart the rewiring process at each episode
-        self.original_graph = graph.copy()
+        self.original_graph = self.graph.copy()
         # Save the graph state before the action, used to compute the metrics
         self.old_graph = None
         # Get the Number of connected components
-        self.n_connected_components = nx.number_connected_components(graph)
+        self.n_connected_components = nx.number_connected_components(self.graph)
 
         # ° ---- HYPERPARAMETERS ---- ° #
         assert beta >= 0 and beta <= 100, "Beta must be between 0 and 100"
@@ -75,7 +77,7 @@ class GraphEnvironment(object):
 
         # ° ---- COMMUNITY DETECTION ---- ° #
         # Name of the environment and the community detection algorithm
-        self.env_name = env_name
+        self.env_name = graph_path.split("/")[-1].split(".")[0]
         self.detection_alg = community_detection_algorithm
         # Community Algorithms objects
         self.detection = CommunityDetectionAlgorithm(
@@ -85,7 +87,7 @@ class GraphEnvironment(object):
         # Compute the community structure of the graph, before the action,
         # i.e. before the deception
         self.original_community_structure = self.detection.compute_community(
-            graph)
+            self.graph)
         # ! It is a NodeClustering object
         self.old_community_structure = self.original_community_structure
         self.new_community_structure = None
@@ -445,6 +447,9 @@ class GraphEnvironment(object):
     ############################################################################
     def print_env_info(self) -> None:
         """Print the environment information"""
+        print("*"*20, "Environment Information", "*"*20)
+        print("* Graph Name:", self.env_name)
+        print("*", self.graph)
         print("* Community Detection Algorithm:", self.detection_alg)
         print("* Number of communities found:",
               len(self.original_community_structure.communities))

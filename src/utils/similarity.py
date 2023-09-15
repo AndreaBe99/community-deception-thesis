@@ -136,7 +136,7 @@ class GraphSimilarity():
             return self.graph_edit_distance
         elif self.function_name == SimilarityFunctionsNames.JAC_1.value:
             return self.jaccard_similarity_1
-        elif self.function_name == SimilarityFunctionsNames.JAC_2value:
+        elif self.function_name == SimilarityFunctionsNames.JAC_2.value:
             return self.jaccard_similarity_2
         else:
             raise Exception("Similarity function not found")

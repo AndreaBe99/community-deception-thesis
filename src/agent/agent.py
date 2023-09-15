@@ -215,9 +215,19 @@ class Agent:
         log_dict : dict
             Dictionary containing the training logs
         """
-        epochs = trange(self.log_dict['train_episodes'])  # epoch iterator
+        episode = self.log_dict['train_episodes']
+        epochs = trange(episode)  # epoch iterator
         self.policy.train()  # set model in train mode
         for i_episode in epochs:
+            # if i_episode == 0:
+            #    pass
+            # elif i_episode % 1000 == 0:
+                # Change target community and target node
+            self.env.change_target_community()
+            # elif i_episode % 100 == 0:
+            #    self.env.change_target_node()
+            
+            # Reset environment, original graph, and new set of possible actions
             self.obs = self.env.reset()
             self.episode_reward = 0
             self.done = False
@@ -468,12 +478,14 @@ class Agent:
         print("* A2C Hidden layer 1 size: ", self.hidden_size_1)
         print("* A2C Hidden layer 2 size: ", self.hidden_size_2)
         print("* Actor Action dimension: ", self.action_dim)
+        print("*", "-"*58, "\n")
         # Print Hyperparameters List
         print("*", "-"*18, "Hyperparameters List", "-"*18)
         print("* Learning rate list: ", self.lr_list)
         print("* Gamma parameter list: ", self.gamma_list)
         print("* Lambda Metric list: ", self.lambda_metrics)
         print("* Alpha Metric list: ", self.alpha_metrics)
+        print("*", "-"*58, "\n")
     
     def print_hyperparams(self):
         print("*", "-"*18, "Model Hyperparameters", "-"*18)

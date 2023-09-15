@@ -236,7 +236,7 @@ class Agent:
                 f"| Actor Loss: {self.a_loss:.2f} " +
                 f"| Critic Loss: {self.v_loss:.2f}")
             # Checkpoint best performing model
-            if self.episode_reward >= self.best_reward:
+            if self.episode_reward / self.step >= self.best_reward:
                 self.save_checkpoint()
                 self.best_reward = self.episode_reward
             # Log

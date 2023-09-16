@@ -154,7 +154,9 @@ def test(
 
         steps.set_description(f"* Testing Episode {step+1}")
     # Save the log
-    path = FilePaths.TEST_DIR.value + f"{agent.env.env_name}/{agent.env.detection_alg}"
+    path = FilePaths.TEST_DIR.value + \
+        f"{agent.env.env_name}/{agent.env.detection_alg}/" + \
+        f"lr-{lr}/gamma-{gamma}/lambda-{lambda_metric}/alpha-{alpha_metric}/"
     Utils.check_dir(path)
     Utils.save_test(log_dict, path)
 

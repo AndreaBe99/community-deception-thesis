@@ -1,6 +1,0 @@
-[submodule "src/lib/pytorch_structure2vec"]
-	path = src/lib/pytorch_structure2vec
-	url = https://github.com/Hanjun-Dai/pytorch_structure2vec.git
-[submodule "src/lib/SCD"]
-	path = src/lib/SCD
-	url = https://github.com/DAMA-UPC/SCD.git

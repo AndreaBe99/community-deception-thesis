@@ -23,7 +23,8 @@ To tackle this problem, we have used the **Advantage Actor-Critic** (A2C) algori
 
 ```math
 \nabla_{\theta} \mathcal{J} (\theta)  \sim \underset{t=0}{\overset{T-1}{\sum}} \nabla_{\theta} \text{log} \pi_{\theta} (a_t \vert s_t) A(s_t, a_t) 
-
+```
+```math
 \text{with } A(s_t, a_t) = r_{t+1} + \gamma \mathcal{V}_v(s_{t+1}) - \mathcal{V}_v (s_t)
 ```
 

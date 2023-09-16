@@ -451,4 +451,5 @@ class GraphEnvironment(object):
               len(self.original_community_structure.communities))
         print("* Rewiring Budget:", self.edge_budget, "=",
               self.beta, "*", self.graph.number_of_edges(), "/ 100",)
+        print("* Weight of the Deception Constraint:", self.tau)
         print("*", "-"*58, "\n")

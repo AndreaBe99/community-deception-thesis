@@ -20,7 +20,11 @@ The aim of community deception is to formulate a function $h_{\theta}(\cdot)$, p
 ![Model Architecture](images/A2C.png)
 
 To tackle this problem, we have used the **Advantage Actor-Critic** (A2C) algorithm, a popular reinforcement learning technique that combines the advantages of both policy-based and value-based methods. It can be defined as:
-$$\nabla_{\theta} \mathcal{J} (\theta)  \sim \underset{t=0}{\overset{T-1}{\sum}} \nabla_{\theta} \text{log} \pi_{\theta} (a_t \vert s_t) A(s_t, a_t) \\ \text{with } A(s_t, a_t) = r_{t+1} + \gamma \mathcal{V}_v(s_{t+1}) - \mathcal{V}_v (s_t)$$
+
+```math
+\nabla_{\theta} \mathcal{J} (\theta)  \sim \underset{t=0}{\overset{T-1}{\sum}} \nabla_{\theta} \text{log} \pi_{\theta} (a_t \vert s_t) A(s_t, a_t) \\ \text{with } A(s_t, a_t) = r_{t+1} + \gamma \mathcal{V}_v(s_{t+1}) - \mathcal{V}_v (s_t)
+```
+
 comprising two neural networks, one for the policy ($\pi_{\theta}$) and another for the value function estimator ($\mathcal{V}_v$), plus, in our case, an encoder for constructing a graph embedding:
 
 - **Encoder**: The encoder serves as a pivotal component of the architecture, primarily due to the computational complexity of the graph, making it infeasible to directly utilize the adjacency matrix as input for the neural network. The encoder's role involves crafting a graph embedding, which will subsequently be used by the A2C neural networks for decision-making. It comprises a pre-trained *Graph2Vec* model that takes the graph's adjacency matrix as input and returns an embedding vector representing the graph's structure.

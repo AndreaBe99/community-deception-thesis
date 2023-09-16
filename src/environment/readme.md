@@ -1,21 +1,65 @@
-# Graph Environment
+# GraphEnvironment Class
 
-The class `GraphEnvironment` represents an environment where an agent will act, which is a graph with a community. The class has an init method that initializes the object with the percentage of edges to rewire/update. The method also sets up the object's attributes, including the graph, community structure, deception score, detection algorithm, community to hide, and rewards.
+## Module Description
 
-- The `get_possible_actions` method returns the possible actions that can be applied to a given graph. The function takes two parameters: a `NetworkX` graph and a list of integers representing the community to hide. The function returns a dictionary of possible actions, whit two keys `ADD` and `REMOVE`, where each key has a list of tuples representing the edges that can be added or removed, respectively.
+This module defines the `GraphEnvironment` class, which represents the environment where an agent will act. The environment is a graph with communities, and the agent's goal is to manipulate the graph while satisfying certain constraints.
 
-- The `get_edge_budget` method returns the number of edges that can be added or removed from a given graph, i.e. the number of actions that can be applied to the graph.
+## Imports
 
-- The `get_reward` method returns the reward for a given action. 
+The module imports various libraries and modules:
 
-- The `plot_graph` method plots the graph using the `matplotlib` library.
+- `community_algs.detection_algs`: Importing a community detection algorithm.
+- `utils.utils`: Importing utility functions and constants.
+- `utils.similarity`: Importing similarity functions.
+- `math`, `networkx`, `random`, and `time`: Standard Python libraries for mathematical operations, graph manipulation, randomization, and time handling.
+- `typing`: Used for type hinting.
 
-- The `delete_repeat_edges` method deletes repeated edges from a Data structure. Indeed, the `NetworkX` library does not allow repeated edges in a graph. The function takes a list of tuples representing the edges of a graph and returns a list of tuples without repeated edges.
+## Class Definition
 
-- The `reset` method resets the environment to its initial state. 
+The `GraphEnvironment` class is defined with several methods and attributes to represent the environment and control agent interactions.
 
-- The `apply_action` method applies an action to a given graph, i.e. adds or removes an edge from the graph. To avoid to do the same action twice, the function substitutes the action applied with the invalid action `(-1,-1)`.
+### Constructor
 
-- The `setup` method sets up the environment with a given graph and community target, and a detection algorithm. 
+The constructor (`__init__`) initializes the environment with the following parameters:
 
-- The `step` method applies an action to the graph, and compute the detection algorithm on the graph, to compute the deception score, and the nmi score. Then it uses the two scores to compute the reward, and returns the new state, and the reward.
+- `graph_path` (optional): Path to the graph data file.
+- `community_detection_algorithm`: Name of the community detection algorithm to use.
+- `beta` (optional): Percentage of edges to remove.
+- `tau` (optional): Strength of the deception constraint.
+- `community_similarity_function` (optional): Name of the community similarity function to use.
+- `graph_similarity_function` (optional): Name of the graph similarity function to use.
+
+### Attributes
+
+- `graph`: The current graph representing the environment.
+- `original_graph`: A copy of the original graph to restart episodes.
+- `old_graph`: The graph state before the agent's action.
+- `n_connected_components`: Number of connected components in the graph.
+- Various hyperparameters and similarity functions.
+- Attributes related to community detection, community manipulation, and budget management.
+- Attributes for tracking rewards, penalties, and episode status.
+- Attributes for storing possible actions and episode step limits.
+
+### Getter Methods
+
+- `get_edge_budget()`: Computes the edge budget for the graph.
+- `get_penalty()`: Computes a penalty based on community and graph distance metrics.
+- `get_reward()`: Computes the reward for the agent based on community similarity and deception constraints.
+- `get_possible_actions()`: Determines possible actions the agent can take.
+
+### Episode Reset Methods
+
+- `reset()`: Resets the environment to its initial state.
+- `change_target_node()`: Changes the target node to remove from the community.
+- `change_target_community()`: Changes the target community to hide the node.
+
+### Episode Step Method
+
+- `step(action)`: Executes a step in the environment based on the agent's action, updating the graph, rewards, and episode status.
+- `apply_action(action)`: Applies the specified action to the graph, adding or removing edges.
+
+### Environment Information
+
+- `print_env_info()`: Prints information about the environment, including graph details, community detection algorithm, budget, and more.
+
+This class provides a framework for simulating an environment where an agent can manipulate a graph while considering community structure and deception constraints.

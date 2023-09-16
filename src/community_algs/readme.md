@@ -1,57 +1,71 @@
-# Community Algorithms
+# Community Detection Algorithms
 
-## Community Detection Algorithms
+This Python module contains code for community detection algorithms using CDLIB and iGraph libraries. It provides classes for detecting communities within a graph and offers flexibility in choosing various community detection algorithms. The module imports necessary libraries and allows the computation of community structures in both NetworkX and iGraph graph representations.
 
-The file `detection_algs.py` is a Python module for **community detection** algorithms. It imports the necessary libraries and defines a class called `DetectionAlgorithm`. This class has an init method that initializes the object with the name of the algorithm. It also has 3 methods
+## Imports
 
-- The `networkx_to_igraph` method converts a `NetworkX` graph to an `iGraph` graph, which allows the use of iGraph's community detection algorithms. The converted graph is stored in the object's `ig_graph` attribute.
+The module imports the following libraries and modules:
 
-- The `compute_community` method computes the community detection algorithm for a given graph and returns a list of lists of integers representing the communities.
+- `sys`: The system module for system-related operations (commented out).
+- `DetectionAlgorithmsNames` from `src.utils.utils`: Provides detection algorithm names as an enum.
+- `List` from `typing`: Used for typing hints.
+- `algorithms`, `NodeClustering` from `cdlib`: CDLIB libraries for community detection.
+- `os`: The operating system module for file operations.
+- `networkx` as `nx`: Used for NetworkX graph operations.
+- `igraph` as `ig`: Used for iGraph graph operations.
+- `matplotlib.pyplot` as `plt`: Used for plotting.
 
-- The `vertexcluster_to_list` method converts an `iGraph` vertex cluster to a list of lists of integers representing the communities.
+## Class: `CommunityDetectionAlgorithm`
 
-- The `plot_graph` method plots the graph using the `matplotlib` library.
+This class provides community detection algorithms using the CDLIB library. It includes the following methods:
 
-- Then we have different methods that allow us to calculate the structure of the communities through a specific algorithm.
+### `__init__(...)`
 
-## Metrics
+- Initializes the `CommunityDetectionAlgorithm` object with the provided algorithm name.
 
-### Deception Score
+### `compute_community(...)`
 
-The file `deception_score.py` is a Python module for calculating the **deception score** of a community, a value that measures how well a community is hidden in a graph, and it can be between 0 and 1, where 1 means that the community is completely hidden and 0 means that the community is completely visible.
+- Computes the community partition of a given NetworkX graph based on the selected algorithm.
 
-It defines a class called `DeceptionScore` that has an init method that initializes the object with a list of integers representing the target community, i.e., the community that we want to hide in the graph. 
-The class also has two static methods called `recall` and `precision` that calculate the recall and precision scores of a given community, respectively. The recall score measures the proportion of members in the target community that are also in the detected community, while the precision score measures the proportion of members in the detected community that are also in the target community. Finally, the class has a method called `compute_deception_score` that calculates the deception score of a community detection algorithm given the community structure and the number of connected components in the graph.
+## Class: `DetectionAlgorithm`
 
-### Node Safeness
+This class offers community detection algorithms using the iGraph library. It includes methods for converting NetworkX graphs to iGraph graphs and for computing various community detection algorithms. The class contains the following methods:
 
-Let $G=(V,E)$ be a network, $C \subset V$ a community, and $u \in C$ a member of $C$. The safeness $\sigma(u,C)$ of $u$ in $G$ is defined as:
-$$\begin{equation} \sigma ({u},{\mathcal{C}}):=\frac{1}{2}\frac{|{V}_{\mathcal{C}}^{u}|-|E(u,\mathcal{C})|}{|\mathcal{C}|-1}+\frac{1}{2} \frac{|\widetilde{E}(u,\mathcal{C})|}{deg(u)}, \end{equation}$$
-where $V^u_C ⊆ C$ is the set of nodes reachable from $u$ passing only via nodes in $C$, and we indicate with $E(u,\bar{V})$ (resp., $\tilde{E}(u,\bar{V})$) the set of intra-community (resp., inter-community) edges for a node $u \in \bar{V}$.
+### `__init__(...)`
 
-### Permanece
+- Initializes the `DetectionAlgorithm` object with the provided algorithm name.
 
-The formulation of permanence is based on three factors: 
+### `networkx_to_igraph(...)`
 
-1. the internal pull $I(v)$ , denoted by the internal connections of a node $v$ within its own community; 
-2. maximum external pull $E_{max}(v)$, denoted by the maximum connections of $v$ to its neighboring communities; 
-3. internal clustering coefficient of $v$, $C_{in}(v)$, denoted by the fraction of actual and possible number of edges among the internal neighbors of $v$. 
-The above three factors are then suitably combined to obtain the permanence of $v$ as
-$$\begin{equation*} \text {Perm}(v,G) = \frac {I(v)}{E_{\text {max}}(v)}\times \frac {1}{\text {deg}(v)} - \big (1 - C_{\text {in}}(v)\big).\tag{2}\end{equation*}$$
-This metric indicates that a vertex would remain in its own community as long as its internal pull is greater than the external pull or its internal neighbors are densely connected to each other, hence forming a near clique.
+- Converts a NetworkX graph to an iGraph graph for compatibility with iGraph's community detection algorithms.
 
-### Normalized Mutual Information (NMI)
+### `compute_community(...)`
 
-The file `nmi.py` is a Python implementation of a class called `NMI` that calculates the **normalized mutual information** between two sets of communities.
+- Computes the community partition of a given NetworkX graph based on the selected algorithm.
 
-The `NMI` class has three methods:
+### `vertexcluster_to_list(...)`
 
-- The `calculate_confusion_matrix` method takes two lists of communities as input and returns a confusion matrix as a `Counter` object. The confusion matrix is a square matrix that shows the number of nodes that are in both communities. The method iterates over each pair of communities and computes the intersection of the two communities using the set data type. The intersection is then stored in the confusion matrix using a tuple of indices as the key.
+- Converts an iGraph `VertexClustering` object to a list of lists, where each inner list represents a community.
 
-**TODO**:
-  - [ ] Avoid to process the same community twice
+### `plot_graph(...)`
 
+- Plots the graph using iGraph for visualization purposes.
 
-- The `calculate_sums` method takes a confusion matrix as input and returns the row sums, column sums, and total sum of the matrix as `Counter` objects. The method iterates over each element of the confusion matrix and updates the row sums, column sums, and total sum accordingly.
+### `compute_louv(...)`, `compute_walk(...)`, `compute_gre(...)`, `compute_inf(...)`, `compute_lab(...)`, `compute_eig(...)`, `compute_btw(...)`, `compute_spin(...)`, `compute_opt(...)`, `compute_scd(...)`
 
-- The `compute_nmi` method takes two lists of communities as input and returns the normalized mutual information between the two sets of communities as a float. The method first calculates the confusion matrix using the `calculate_confusion_matrix` method, and then calculates the row sums, column sums, and total sum of the matrix using the `calculate_sums` method. The method then iterates over each element of the confusion matrix and computes the mutual information between the two communities using the formula for mutual information. The mutual information is then normalized using the formula for normalized mutual information.
+- Compute community detection algorithms using various iGraph methods.
+
+### `write_graph_to_file(...)`
+
+- Writes the graph to a text file, where each line represents an edge in the graph.
+
+### `read_data_from_file(...)`
+
+- Reads data from a file and returns a list of lists, where each inner list represents a community.
+
+## Example Usage
+
+The module includes an example usage section that demonstrates how to create a graph, initialize a community detection algorithm, compute communities, and print the results.
+
+Overall, the module provides a comprehensive set of community detection algorithms using both CDLIB and iGraph libraries, making it suitable for various network analysis tasks.
+

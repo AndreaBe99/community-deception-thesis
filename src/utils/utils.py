@@ -109,7 +109,7 @@ class HyperParams(Enum):
     
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 1000#0
+    MAX_EPISODES = 10
     # Dictonary for logging
     LOG_DICT = {
         'train_reward': [],
@@ -338,6 +338,8 @@ class Utils:
             file_path+"/training_loss.png",
         )
         
+        if window_size < 1:
+            window_size = 1
         # Compute the rolling windows of the time series data using NumPy
         rolling_data_1 = np.convolve(np.array(log["train_avg_reward"]),
             np.ones(window_size) / window_size, mode='valid')

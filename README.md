@@ -17,7 +17,7 @@ The aim of community deception is to formulate a function $h_{\theta}(\cdot)$, p
 
 ## Model Architecture
 
-![Model Architecture](images/A2C.png)
+![Model Architecture](images/A2C_background.png)
 
 To tackle this problem, we have used the **Advantage Actor-Critic** (A2C) algorithm, a popular reinforcement learning technique that combines the advantages of both policy-based and value-based methods. It can be defined as:
 

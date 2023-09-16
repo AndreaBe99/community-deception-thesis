@@ -75,21 +75,21 @@ class SimilarityFunctionsNames(Enum):
 class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # ! REAL GRAPH Graph path (change the following line to change the graph)
-    GRAPH_NAME = FilePaths.KAR.value
+    GRAPH_NAME = FilePaths.DOL.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
     DETECTION_ALG_NAME = DetectionAlgorithmsNames.INF.value
     # Numeber of possible action with BETA=30, is 30% of the edges
     BETA = 10
     # ! Strength of the deception constraint, value between 0 (hard) and 1 (soft) 
-    TAU = 0.8
+    TAU = 0.3
     # ° Hyperparameters  Testing ° #
     # ! Weight to balance the penalty in the reward
     # The higher its value the more importance the penalty will have
-    LAMBDA = [0.1] # [0.01, 0.1, 1]
+    LAMBDA = [1] # [0.01, 0.1, 1]
     # ! Weight to balance the two metrics in the definition of the penalty
     # The higher its value the more importance the distance between communities 
     # will have, compared with the distance between graphs
-    ALPHA = [0.7] # [0.3, 0.5, 0.7]
+    ALPHA = [0.9] # [0.3, 0.5, 0.7]
     
     """ Graph Encoder Parameters """""
     EMBEDDING_DIM = 128 # 256
@@ -103,13 +103,13 @@ class HyperParams(Enum):
     BEST_REWARD = 0.7  # -np.inf
     # ° Hyperparameters  Testing ° #
     # ! Learning rate, it controls how fast the network learns
-    LR = [1e-3] # [1e-7, 1e-4, 1e-1]
+    LR = [1e-2] # [1e-7, 1e-4, 1e-1]
     # ! Discount factor
-    GAMMA = [0.95] # [0.9, 0.95]
+    GAMMA = [0.3] # [0.9, 0.95]
     
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 10#00
+    MAX_EPISODES = 1000#0
     # Dictonary for logging
     LOG_DICT = {
         'train_reward': [],
@@ -127,7 +127,7 @@ class HyperParams(Enum):
     
     """Evaluation Parameters"""
     # ! Change the following parameters according to the hyperparameters to test
-    STEPS_EVAL = 10#00
+    STEPS_EVAL = 1000
     LR_EVAL = LR[0]
     GAMMA_EVAL = GAMMA[0]
     LAMBDA_EVAL = LAMBDA[0]
@@ -277,7 +277,7 @@ class Utils:
         env_name: str, 
         detection_algorithm: str,
         file_path: str,
-        window_size: int=100):
+        window_size: int=int(HyperParams.MAX_EPISODES.value/100)):
         """Plot the training results
 
         Parameters
@@ -461,14 +461,22 @@ class Utils:
         
         # Plot the results
         # Algorithms
-        list_algs = ["agent", "rh", "dh", "di"]
+        list_algs = ["rh", "dh", "di", "agent"]
+        colors = ["red", "green", "orange", "blue"]
+        marker = ["+", "x", "*", "o"]
         # Metrics for each algorithm
         metrics = ["goal", "nmi", "time", "steps"]
         for metric in metrics:
             fig, ax = plt.subplots()
             ax.set_title(metric)
-            for alg in list_algs:
-                ax.plot(log[alg][metric], label=alg)
+            for i, alg in enumerate(list_algs):
+                # ax.plot(log[alg][metric], label=alg)
+                ax.scatter(
+                    range(len(log[alg][metric])),
+                    log[alg][metric], 
+                    marker=marker[i],
+                    label=alg,
+                    c=colors[i])
             ax.legend()
             plt.savefig(f"{files_path}/{metric}.png")
 

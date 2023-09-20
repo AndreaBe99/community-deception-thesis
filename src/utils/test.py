@@ -13,6 +13,9 @@ import time
 
 def test(
     agent: Agent,
+    beta: float,
+    tau: float,
+    model_path: str,
     eval_steps: int = HyperParams.STEPS_EVAL.value,
     lr: float = HyperParams.LR_EVAL.value,
     gamma: float = HyperParams.GAMMA_EVAL.value,
@@ -31,6 +34,12 @@ def test(
     ----------
     agent : Agent
         Agent to evaluate
+    beta : float
+        Beta parameter for the number of rewiring steps
+    tau : float
+        Tau parameter as constraint for community target similarity
+    model_path : str
+        Path to the model to load
     eval_steps : int, optional
         Number of episodes to test, by default 1000
     lr : float, optional
@@ -42,15 +51,30 @@ def test(
     alpha_metric : float, optional
         Weight to balance the penalties, by default 0.1
     """
-    
     # Initialize the log dictionary
-    log_dict = HyperParams.EVAL_DICT.value
-    log_dict['env_name'] = agent.env.env_name
-    log_dict['detection_alg'] = agent.env.detection_alg
-    log_dict["agent"]["lr"] = lr
-    log_dict["agent"]["gamma"] = gamma
-    log_dict["agent"]["lambda_metric"] = lambda_metric
-    log_dict["agent"]["alpha_metric"] = alpha_metric
+    
+    log_dict = Utils.initialize_dict(HyperParams.ALGS_EVAL.value)
+    
+    # Set parameters in the environment
+    agent.env.beta = beta
+    agent.env.edge_budget = agent.env.get_edge_budget() * agent.env.beta
+    agent.env.max_steps = agent.env.edge_budget * HyperParams.MAX_STEPS_MUL.value
+    agent.env.tau = tau
+    
+    # Add environment parameters to the log dictionary
+    log_dict["env"] = dict()
+    log_dict["env"]["dataset"] = agent.env.env_name
+    log_dict["env"]["detection_alg"] = agent.env.detection_alg
+    log_dict["env"]["beta"] = beta
+    log_dict["env"]["tau"] = tau
+    log_dict["env"]["edge_budget"] = agent.env.edge_budget
+    log_dict["env"]["max_steps"] = agent.env.max_steps
+    
+    # Add Agent Hyperparameters to the log dictionary
+    log_dict["Agent"]["lr"] = lr
+    log_dict["Agent"]["gamma"] = gamma
+    log_dict["Agent"]["lambda_metric"] = lambda_metric
+    log_dict["Agent"]["alpha_metric"] = alpha_metric
     
     # Start evaluation
     steps = trange(eval_steps, desc="Testing Episode")
@@ -58,13 +82,18 @@ def test(
         
         # Change the target community and node at each episode
         agent.env.change_target_community()
+        
         # ° ------ Agent ------ ° #
+        steps.set_description(f"* Testing Episode {step+1} | Agent Rewiring")
         start = time.time()
         new_graph = agent.test(
             lr=lr,
             gamma=gamma,
             lambda_metric=lambda_metric,
-            alpha_metric= alpha_metric)
+            alpha_metric= alpha_metric,
+            model_path=model_path,
+        )
+        # "src/logs/lfr_benchmark_n-300/infomap/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7"
         end = time.time() - start
         
         # ° Target node and community for this episode ° #
@@ -82,11 +111,12 @@ def test(
         agent_goal = Utils.check_goal(agent.env, node_target, community_target, agent_community)
         # Save the metrics
         log_dict = save_metrics(
-            log_dict, "agent", agent_goal, agent_nmi, end, agent.step)
+            log_dict, "Agent", agent_goal, agent_nmi, end, agent.step)
 
         
         # Perform Deception with the baseline algorithms
         # ° ------ Random Hiding ------ ° #
+        steps.set_description(f"* Testing Episode {step+1} | Random Rewiring")
         random_hiding = RandomHiding(
             env=agent.env,
             steps=agent.env.edge_budget,
@@ -106,10 +136,11 @@ def test(
             agent.env, node_target, community_target, rh_community)
         # Save the metrics
         log_dict = save_metrics(
-            log_dict, "rh", rh_goal, rh_nmi, end, agent.env.edge_budget-random_hiding.steps)
+            log_dict, "Random", rh_goal, rh_nmi, end, agent.env.edge_budget-random_hiding.steps)
         
 
         # ° ------ Degree Hiding ------ ° #
+        steps.set_description(f"* Testing Episode {step+1} | Degree Rewiring")
         degree_hiding = DegreeHiding(
             env=agent.env,
             steps=agent.env.edge_budget,
@@ -129,9 +160,10 @@ def test(
             agent.env, node_target, community_target, dh_community)
         # Save the metrics
         log_dict = save_metrics(
-            log_dict, "dh", dh_goal, dh_nmi, end, agent.env.edge_budget-degree_hiding.steps)
+            log_dict, "Degree", dh_goal, dh_nmi, end, agent.env.edge_budget-degree_hiding.steps)
 
         # ° ------ Roam Heuristic ------ ° #
+        steps.set_description(f"* Testing Episode {step+1} | Roam Rewiring")
         # Apply Hide and Seek
         deception = RoamHiding(
             agent.env.original_graph.copy(), node_target, agent.env.detection_alg)
@@ -150,15 +182,21 @@ def test(
             agent.env, node_target, community_target, di_community)
         # Save the metrics
         log_dict = save_metrics(
-            log_dict, "di", di_goal, di_nmi, end, agent.env.edge_budget)
+            log_dict, "Roam", di_goal, di_nmi, end, agent.env.edge_budget)
 
         steps.set_description(f"* Testing Episode {step+1}")
     # Save the log
     path = FilePaths.TEST_DIR.value + \
-        f"{agent.env.env_name}/{agent.env.detection_alg}/" + \
+        f"{log_dict['env']['dataset']}/{log_dict['env']['detection_alg']}/" + \
+        f"tau-{tau}/beta-{beta}/" + \
         f"lr-{lr}/gamma-{gamma}/lambda-{lambda_metric}/alpha-{alpha_metric}/"
     Utils.check_dir(path)
-    Utils.save_test(log_dict, path)
+    Utils.save_test(
+        log_dict, 
+        path, 
+        "evaluation_node_hiding", 
+        algs=["Agent", "Random", "Degree", "Roam"],
+        metrics=["nmi", "goal", "time", "steps"])
 
 
 ################################################################################

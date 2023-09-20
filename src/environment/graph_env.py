@@ -4,10 +4,13 @@ from src.utils.utils import HyperParams, SimilarityFunctionsNames, Utils
 from src.utils.similarity import CommunitySimilarity, GraphSimilarity
 from typing import List, Tuple, Callable
 
+from karateclub import Node2Vec
+
 import math
 import networkx as nx
 import random
 import time
+import torch
 
 
 class GraphEnvironment(object):
@@ -43,6 +46,8 @@ class GraphEnvironment(object):
             SimilarityFunctionsNames.JAC_1.value
         """
         random.seed(time.time())
+        self.device = torch.device(
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
         # ° ---- GRAPH ---- ° #
         # Load the graph from the dataset folder
         if graph_path is None:
@@ -50,12 +55,32 @@ class GraphEnvironment(object):
             self.graph, graph_path = Utils.generate_lfr_benchmark_graph()
         else:
             self.graph = Utils.import_mtx_graph(graph_path)
+        
+        # Build node features using Node2Vec, set the embedding dimension to 128.
+        self.embedding_model = Node2Vec(
+            dimensions=HyperParams.EMBEDDING_DIM.value)
+        print("* * Compute Node Embedding using Node2Vec for nodes features")
+        print("* * ...")
+        self.embedding_model.fit(self.graph)
+        print("* * End Embedding Computation")
+        self.embedding = self.embedding_model.get_embedding()
+        # Add the embedding to the graph
+        for node in self.graph.nodes():
+            self.graph.nodes[node]["x"] = torch.tensor(self.embedding[node])
+            # delete all the other features
+        
+        # Delete edges without "weight" attribute
+        for edge in self.graph.edges():
+            if "weight" not in self.graph.edges[edge]:
+                self.graph.remove_edge(*edge)
+        
         # Save the original graph to restart the rewiring process at each episode
         self.original_graph = self.graph.copy()
         # Save the graph state before the action, used to compute the metrics
         self.old_graph = None
         # Get the Number of connected components
-        self.n_connected_components = nx.number_connected_components(self.graph)
+        self.n_connected_components = nx.number_connected_components(
+            self.graph)
 
         # ° ---- HYPERPARAMETERS ---- ° #
         assert beta >= 0 and beta <= 100, "Beta must be between 0 and 100"
@@ -103,13 +128,14 @@ class GraphEnvironment(object):
         self.node_target = random.choice(self.community_target)
 
         # ° ---- REWIRING STEP ---- ° #
-        # Compute the edge budget for the graph
-        self.edge_budget = self.get_edge_budget()
+        # Compute the edge budget for the graph, i.e. the mean degree of the 
+        # graph times the parameter beta
+        self.edge_budget = self.get_edge_budget() * self.beta
         # Amount of budget used
         self.used_edge_budget = 0
-        # Max Rewiring Steps during an episode, set a limit to avoid infinite episodes
-        # in case the agent does not find the target node
-        self.max_steps = self.graph.number_of_edges()  # *2
+        # Max Rewiring Steps during an episode, set a limit to avoid infinite 
+        # episodes in case the agent does not find the target node
+        self.max_steps = self.edge_budget * HyperParams.MAX_STEPS_MUL.value
         # Whether the budget for the graph rewiring is exhausted, or the target
         # node does not belong to the community anymore
         self.stop_episode = False
@@ -138,7 +164,9 @@ class GraphEnvironment(object):
         int
             Edge budgets of the graph
         """
-        return int(math.ceil((self.graph.number_of_edges() * self.beta / 100)))
+        # Get the mean degree of the graph
+        return int(self.graph.number_of_edges() / self.graph.number_of_nodes())
+        # return int(math.ceil((self.graph.number_of_edges() * self.beta / 100)))
 
     def get_penalty(self) -> float:
         """
@@ -269,9 +297,14 @@ class GraphEnvironment(object):
     #                       EPISODE RESET FUNCTIONS                            #
     ############################################################################
 
-    def reset(self) -> nx.Graph:
+    def reset(self, graph_reset=True) -> nx.Graph:
         """
         Reset the environment
+        
+        Parameters
+        ----------
+        graph_reset : bool, optional
+            Whether to reset the graph to the original state, by default True
 
         Returns
         -------
@@ -282,7 +315,8 @@ class GraphEnvironment(object):
         self.stop_episode = False
         self.rewards = 0
         self.old_rewards = 0
-        self.graph = self.original_graph.copy()
+        if graph_reset:
+            self.graph = self.original_graph.copy()
         self.old_graph = None
         self.old_penalty_value = 0
         self.old_community_structure = self.original_community_structure
@@ -330,8 +364,9 @@ class GraphEnvironment(object):
                 self.community_target = random.choice(
                     self.original_community_structure.communities)
                 # Check condition on new community
-                if len(self.community_target) > 1 and \
-                        self.community_target != old_community:
+                if (len(self.community_target) > 1 and \
+                        self.community_target != old_community) or \
+                            len(self.original_community_structure.communities) < 2:
                     done = True
             del old_community
         else:
@@ -342,7 +377,7 @@ class GraphEnvironment(object):
     ############################################################################
     #                      EPISODE STEP FUNCTIONS                              #
     ############################################################################
-    def step(self, action: int) -> Tuple[nx.Graph, float, bool]:
+    def step(self, action: int) -> Tuple[nx.Graph, float, bool, bool]:
         """
         Step function for the environment
 
@@ -359,9 +394,11 @@ class GraphEnvironment(object):
         self.rewards : float
             Reward of the agent
         self.stop_episode : bool
+            If the budget for the graph rewiring is exhausted, or the target
+            node does not belong to the community anymore, the episode is finished
+        done : bool
             Whether the episode is finished, if the target node does not belong
-            to the community anymore, or the budget for the graph rewiring is
-            exhausted, the episode is finished
+            to the community anymore, the episode is finished.
         """
         # ° ---- ACTION ---- ° #
         # Save the graph state before the action, used to compute the metrics
@@ -373,7 +410,7 @@ class GraphEnvironment(object):
             self.rewards = -1
             # The state is the same as before
             # return self.data_pyg, self.rewards, self.stop_episode
-            return self.graph, self.rewards, self.stop_episode
+            return self.graph, self.rewards, self.stop_episode, False
 
         # ° ---- COMMUNITY DETECTION ---- ° #
         # Compute the community structure of the graph after the action
@@ -395,11 +432,11 @@ class GraphEnvironment(object):
             self.stop_episode = True
             # If the budget is exhausted, and the target node still belongs to
             # the community, the reward is negative
-            if not done:
-                self.rewards = -2
+            # if not done:
+            #    self.rewards = -2
 
         self.old_community_structure = self.new_community_structure
-        return self.graph, self.rewards, self.stop_episode
+        return self.graph, self.rewards, self.stop_episode, done
 
     def apply_action(self, action: int) -> int:
         """
@@ -449,7 +486,10 @@ class GraphEnvironment(object):
         print("* Community Detection Algorithm:", self.detection_alg)
         print("* Number of communities found:",
               len(self.original_community_structure.communities))
-        print("* Rewiring Budget:", self.edge_budget, "=",
-              self.beta, "*", self.graph.number_of_edges(), "/ 100",)
+        # print("* Rewiring Budget:", self.edge_budget, "=", self.beta, "*", self.graph.number_of_edges(), "/ 100",)
+        print("* Rewiring Budget: (n_edges/n_nodes)*BETA =",
+              self.graph.number_of_edges(), "/",
+              self.graph.number_of_nodes(), "*", self.beta, "=",
+              int(self.graph.number_of_edges() / self.graph.number_of_nodes())*self.beta)
         print("* Weight of the Deception Constraint:", self.tau)
         print("*", "-"*58, "\n")

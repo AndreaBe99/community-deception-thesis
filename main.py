@@ -3,7 +3,9 @@ from src.environment.graph_env import GraphEnvironment
 from src.agent.agent import Agent
 
 from src.utils.test import test
+from src.utils.community_deception import community_deception
 import argparse
+import math
 
 
 def get_args():
@@ -35,6 +37,28 @@ if __name__ == "__main__":
         agent.grid_search()
     # ° ------ TEST ------ ° #
     elif args.mode == 'test':
-        test(agent=agent)
+        # To change the detection algorithm, or the dataset, on which the model
+        # will be tested, please refer to the class HyperParams in the file
+        # src/utils/utils.py, changing the values of the variables:
+        # - GRAPH_NAME, for the dataset
+        # - DETECTION_ALG, for the detection algorithm
+        
+        # To change the model path, please refer to the class FilePaths in the
+        # file src/utils/utils.py
+        model_path = FilePaths.TRAINED_MODEL.value
+        
+        # Change the beta and tau parameters on which the model will be tested
+        betas = [HyperParams.BETA.value]  # [1,3,5]
+        taus = [0.3, 0.5, 0.8]
+        
+        # Get communty target
+        community_target = agent.env.community_target
+        for beta in betas:
+            for tau in taus:
+                print("* * Testing with beta = {} and tau = {}".format(beta, tau))
+                test(agent=agent, model_path=model_path, beta=beta, tau=tau)
+                # print("* * Community Hiding with beta = {} and tau = {}".format(beta, tau))
+                # community_deception(agent=agent, community_target=community_target, beta=beta, tau=tau, model_path=model_path)
+                print("*"*50)
     else:
         raise ValueError("Invalid mode. Please choose between 'train' and 'test'")

@@ -3,10 +3,10 @@ from typing import List, Set, Tuple
 
 class Safeness:
     """Computes the safeness of a node in a community and the safeness of a community."""
-    def __init__(self, graph: nx.Graph, community_target: List[int], node_target: int):
+    def __init__(self, graph: nx.Graph, community_target: List[int]):
         self.graph = graph
         self.community_target = community_target
-        self.node_target = node_target
+        # self.node_target = node_target
         # Compute the number of nodes in a community C that are in the same connected component of u
         self.V_u_C = self.num_nodes_in_same_component()
         # Get the number of intra-community edges for u.
@@ -14,94 +14,172 @@ class Safeness:
         # Get the number of inter-community edges for u.
         self.E_u_C_bar = self.get_inter_community_edges()
     
-    def node_hiding(self, edge_budget: int) -> nx.Graph:
+    def community_hiding(self, community_target, edge_budget: int) -> nx.Graph:
         """
-        Hide the target node from the community.
-        """
-        print("*"*20, "Node Hiding with Safeness", "*"*20)
-        print("* Edge Budget:", edge_budget)
-        print("* Node Target:", self.node_target)
-        print("* Community Target:", self.community_target)
-        print("* Community Nodes Reachability:", self.V_u_C)
-        print("* Community Intra-Edges:", self.E_u_C)
-        print("* Community Inter-Edges:", self.E_u_C_bar)
-        
-        print("*"*20, "     Start Rewiring     ", "*"*20)
-        while True:
-            destination_nodes = self.find_external_node()
-            # Get the node from destination_nodes that maximizes the addition gain
-            # add_gain = max(self.get_addition_gain((self.node_target, node)) for node in destination_nodes)
-            add_max_node = max(destination_nodes, key=lambda x: self.get_addition_gain((self.node_target, x)))
-            add_edge = (self.node_target, add_max_node)
-            add_gain = self.get_addition_gain(add_edge)
+        Hide the target community using the safeness metric.
 
-            
-            del_edge, del_gain = self.get_best_del_excl_bridges()
-            # del_gain = self.get_deletion_gain(del_edge)
+        Parameters
+        ----------
+        community_target : _type_
+            Community to hide.
+        edge_budget : int
+            Budget of edges to use.
 
-            if add_gain >= del_gain:
-                self.graph.add_edge(*add_edge)
-                print(f"* Add edge: ({add_edge})")
-            elif del_gain > 0:
-                self.graph.remove_edge(*del_edge)
-                print(f"* Remove edge: {del_edge}")
-            else:
-                print("* No more edges to add or remove")
-            if edge_budget <= 0 or (add_gain <= 0 and del_gain <= 0):
-                break
-        print("*"*20, "      End Rewiring      ", "*"*20)
-        return self.graph
-    
-    def get_node_minimum_add_ratio(self) -> float:
-        """
-        Computes, for a node n inside the target community, the fraction of 
-        n’s edges that point outside C
-        
         Returns
         -------
-        int:
+        nx.Graph
+            Graph with the target community hidden.
+        """
+        initial_budget = edge_budget
+        while True:
+            n_p = self.get_node_minimum_add_ratio(community_target)
+            n_t = self.find_external_node(n_p, community_target)
+            eps_add = self.get_addition_gain((n_p, n_t), community_target)
+            
+            n_k, n_l = self.get_best_del_excl_bridges(community_target)
+            if n_k == None and n_l == None:
+                eps_del = -1
+            else:
+                eps_del = self.get_deletion_gain((n_k, n_l), community_target)
+            
+            if eps_add >= eps_del:
+                self.graph.add_edge(n_p, n_t)
+            elif eps_del > 0:
+                self.graph.remove_edge(n_k, n_l)
+            
+            edge_budget -= 1
+            
+            if edge_budget <= 0 or (eps_add <= 0 and eps_del <= 0):
+                break
+        steps = initial_budget - edge_budget
+        return self.graph, steps
+    
+    def get_node_minimum_add_ratio(self, community_target: List[int])->int:
+        """
+        Computes for each node n inside the target community, the fraction of
+        n’s edges that point outside C.
+
+        Parameters
+        ----------
+        community_target : List[int]
+            Target community.
+
+        Returns
+        -------
+        min_add_ratio : int
             Node with the minimum add ratio.
         """
-        min_add_ratio = dict()
-        n_neighbors = self.graph.neighbors(self.node_target)
-        for neighbor in n_neighbors:
-            min_add_ratio.append[neighbor] = 0
-            if neighbor in self.community_target:
-                min_add_ratio.append[neighbor] += 1
-        for neighbor in min_add_ratio:
-            min_add_ratio[neighbor] = min_add_ratio[neighbor] / len(n_neighbors)
-        # Return the neighbor with the minimum add ratio
-        return min(min_add_ratio, key=lambda x: x[1])
-
-    def find_external_node(self) -> int:
-        """
-        Find a list of external nodes, such that the node is not connected to
-        the target node.
+        # List of Tuple of (node, min_add_ratio)
+        node_min_add_ratio = list()
+        for n in community_target:
+            min_add_ratio = 0
+            for neighbor in self.graph.neighbors(n):
+                if neighbor not in community_target:
+                    min_add_ratio += 1
+            min_add_ratio = min_add_ratio / self.graph.degree(n)
+            node_min_add_ratio.append((n, min_add_ratio))
         
+        # Get the node with the minimum add ratio
+        min_add_ratio = min(node_min_add_ratio, key=lambda x: x[1])
+        return min_add_ratio[0]
+    
+    def find_external_node(self, n_p: int, community_target: List[int]) -> int:
+        """
+        Find a node n_t not in community_target, such that the edge (n_p, n_t)
+        does not exist.
+        
+        Parameters
+        ----------
+        n_p : int
+            Node p.
+        community_target : List[int]
+            Target community.
+
         Returns
         -------
         int
             Destination node.
         """
-        external_nodes = list()
-        for node in self.graph.nodes():
-            if node not in self.community_target \
-                and (not self.graph.has_edge(self.node_target, node) or \
-                    not self.graph.has_edge(node, self.node_target)):
-                external_nodes.append(node)
-        # List of external nodes, such that the node is not connected to the
-        # target node.
-        return external_nodes
-        
+        # get neighbors of n_p
+        neighbors_p = self.graph.neighbors(n_p)
+        for n_t in self.graph.nodes():
+            if n_t not in community_target and n_t not in neighbors_p:
+                return n_t
     
-    def get_addition_gain(self, edge: Tuple[int]) -> float:
+    def get_best_del_excl_bridges(self, community_target: List[int]) -> Tuple[int, int]:
+        """
+        It works in two phases:
+            1. It excludes bridge edges that, if deleted, could disconnect 
+                target community.
+            2. For each remeining edge, it computes the value specified in 
+                theorem 8.
+
+        Parameters
+        ----------
+        community_target : 
+            Community target.
+
+        Returns
+        -------
+        Tuple[int, int]
+            Edge with the maximum eps_del.
+        """
+        graph = self.graph.copy()
+        # Delete all bridge edges that, if deleted, could disconnect target community.
+        for node in community_target:
+            # Get the neighbors of the node
+            neighbors = self.graph.neighbors(node)
+            for neighbor in neighbors:
+                if neighbor not in community_target:
+                    # Check if the edge is a bridge
+                    if self.is_bridge((node, neighbor)):
+                        graph.remove_edge(node, neighbor)
+
+        # List of Tuple of (edge, eps_del)
+        esp_del_list = list()
+        for node in community_target:
+            # Get the neighbors of the node
+            neighbors = self.graph.neighbors(node)
+            for neighbor in neighbors:
+                if neighbor not in community_target:
+                    eps_del = self.get_deletion_gain((node, neighbor), community_target)
+                    esp_del_list.append(((node, neighbor), eps_del))
+        
+        # Get the edge with the maximum eps_del
+        if len(esp_del_list) < 1:
+            return (None, None)
+        max_eps_del = max(esp_del_list, key=lambda x: x[1])
+        return max_eps_del[0]
+    
+    def is_bridge(self, edge: Tuple[int, int]) -> bool:
+        """
+        Check if the edge (node, neighbor) is a bridge, i.e. if we remove it 
+        the graph will be disconnected.
+
+        Parameters
+        ----------
+        edge : Tuple[int, int]
+            Edge to check.
+
+        Returns
+        -------
+        bool
+            True if the edge is a bridge, False otherwise.
+        """
+        graph = self.graph.copy()
+        graph.remove_edge(*edge)
+        return not nx.is_connected(graph)
+    
+    def get_addition_gain(self, edge: Tuple[int, int], community_target: List[int])->float:
         """
         Computes the addition gain of adding an edge.
 
         Parameters
         ----------
-        edge : Tuple[int]
+        edge : Tuple[int, int]
             Edge to add.
+        community_target : List[int]
+            Community target.
 
         Returns
         -------
@@ -110,77 +188,40 @@ class Safeness:
         """
         graph = self.graph.copy()
         # Compute the safeness before and after adding the edge.
-        safeness_before = self.compute_node_safeness(
-            graph, self.community_target, self.node_target)
+        safeness_before = self.compute_community_safeness(
+            graph, community_target)
         graph.add_edge(*edge)
-        safeness_after = self.compute_node_safeness(
-            graph, self.community_target, self.node_target)
+        safeness_after = self.compute_community_safeness(
+            graph, community_target)
         return safeness_after - safeness_before
-
-    def get_deletion_gain(self, edge: Tuple[int]) -> float:
+    
+    def get_deletion_gain(self, edge: Tuple[int, int], community_target: List[int])->float:
         """
         Computes the deletion gain of deleting an edge.
 
         Parameters
         ----------
-        edge : Tuple[int]
+        edge : Tuple[int, int]
             Edge to delete.
+        community_target : List[int]
+            Community target.
 
         Returns
         -------
         float
-            Deletion gain.
+            Delete gain.
         """
         graph = self.graph.copy()
-        # Compute the safeness before and after removing the edge.
-        safeness_before = self.compute_node_safeness(
-            graph, self.community_target, self.node_target)
+        # Compute the safeness before and after adding the edge.
+        safeness_before = self.compute_community_safeness(
+            graph, community_target)
         graph.remove_edge(*edge)
-        safeness_after = self.compute_node_safeness(
-            graph, self.community_target, self.node_target)
+        safeness_after = self.compute_community_safeness(
+            graph, community_target)
         return safeness_after - safeness_before
     
-    def get_best_del_excl_bridges(self) -> Tuple[int]:
-        """ 
-        It works in two phases; it excludes bridge edges that, if deleted, 
-        could disconnect C; then, for each remaining edge, it computes the 
-        value specified in Theorem 8.
-        
-        Returns
-        -------
-        Tuple[int]
-            The edge to delete.
-        """
-        graph = self.graph.copy()
-        max_gain = dict()
-        for edge in self.graph.neighbors(self.node_target):
-            edge = (self.node_target, edge)
-            # Compute the safeness before and after removing the edge.
-            safeness_before = self.compute_node_safeness(
-                graph, self.community_target, self.node_target)
-            
-            if graph.has_edge(*edge):
-                graph.remove_edge(*edge)
-            else:
-                graph.remove_edge(*edge[::-1])
-            # Compute subgraph of the community
-            subgraph = graph.subgraph(self.community_target)
-            # Check if the subgraph is connected
-            if not nx.is_connected(subgraph):
-                graph.add_edge(*edge)
-            else:
-                safeness_after = self.compute_node_safeness(
-                    graph, self.community_target, self.node_target)
-                max_gain[edge] = safeness_after - safeness_before
-        
-        if len(max_gain) > 0:
-            # get max value and its key
-            max_edge = max(max_gain, key=lambda x: x[1])
-            max_gain = max_gain[max_edge]
-            return max_edge, max_gain
-        return None, -1
-        
-    def compute_community_safeness(self, community_target: List[int]) -> float:
+    
+    def compute_community_safeness(self, graph, community_target: List[int]) -> float:
         """
         Computes the community safeness of the community.
         
@@ -197,8 +238,7 @@ class Safeness:
         community_safeness = 0
         for node in community_target:
             community_safeness += self.compute_node_safeness(
-                self.graph, community_target, node)
-            # print(f"Node {node} safeness: {node_safeness}")
+                graph, community_target, node)
         return community_safeness / len(community_target)
     
     def compute_node_safeness(

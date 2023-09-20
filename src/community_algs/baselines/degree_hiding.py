@@ -23,11 +23,25 @@ class DegreeHiding():
         self.target_community = target_community
         self.detection_alg = self.env.detection
         self.original_community_structure = self.env.original_community_structure
-        self.possible_edges = self.env.possible_actions
+        self.possible_edges = self.get_possible_action()  # self.env.possible_actions
         # Put all the edges in a list
-        self.possible_edges = list(
-            self.possible_edges["ADD"]) + list(self.possible_edges["REMOVE"])
+        # self.possible_edges = self.env.possible_actions
+        # self.possible_edges = list(self.possible_edges["ADD"]) + list(self.possible_edges["REMOVE"])
 
+    def get_possible_action(self):
+        # Put all edge between the target node and its neighbors in a list
+        possible_actions_add = []
+        for neighbor in self.graph.neighbors(self.target_node):
+            possible_actions_add.append((self.target_node, neighbor))
+
+        # Put all the edges that aren't neighbors of the target node in a list
+        possible_actions_remove = []
+        for node in self.graph.nodes():
+            if node != self.target_node and node not in self.graph.neighbors(self.target_node):
+                possible_actions_remove.append((self.target_node, node))
+        possible_action = possible_actions_add + possible_actions_remove
+        return possible_action
+    
     def hide_target_node_from_community(self) -> tuple:
         """
         Hide the target node from the target community by rewiring its edges, 

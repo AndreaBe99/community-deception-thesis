@@ -18,7 +18,7 @@ class CriticNetwork(nn.Module):
         super(CriticNetwork, self).__init__()
 
         # self.graph_encoder = GraphEncoder(state_dim)
-        # self.conv1 = GCNConv(state_dim, state_dim)
+        self.conv1 = GCNConv(state_dim, state_dim)
         
         self.lin1 = nn.Linear(state_dim, hidden_size_1)
         self.lin2 = nn.Linear(hidden_size_1, hidden_size_2)
@@ -29,22 +29,25 @@ class CriticNetwork(nn.Module):
         # self.relu = F.relu
         # self.tanh = nn.Tanh()
 
+    
     def forward(self, data: torch.Tensor)->torch.Tensor:
-        # out = F.relu(self.conv1(data.x, data.edge_index))
-        # x = out + data.x
-        # x = torch.sum(x, dim=0)
-        x = self.relu(self.lin1(data))
-        # x = self.relu(self.lin1(x))
+        out = F.relu(self.conv1(data.x, data.edge_index))
+        x = out + data.x
+        x = torch.sum(x, dim=0)
+        # x = self.relu(self.lin1(data))
+        x = self.relu(self.lin1(x))
         x = self.relu(self.lin2(x))
         x = self.lin3(x)
         return x
 
     """
+    # Using GraphEncoder
     def forward(self, state: Data):
-        embedding = self.graph_encoder(state)
+        embedding, _ = self.graph_encoder(state)
+        embedding += state.x
         embedding = torch.sum(embedding, dim=0)
-        value = self.relu(self.linear1(embedding))
-        value = self.relu(self.linear2(value))
-        value = self.linear3(value)
+        value = self.relu(self.lin1(embedding))
+        value = self.relu(self.lin2(value))
+        value = self.lin3(value)
         return value
     """

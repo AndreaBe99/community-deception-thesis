@@ -1,9 +1,9 @@
 """Module for the ActorCritic class"""
 from src.agent.a2c.actor import ActorNetwork
 from src.agent.a2c.critic import CriticNetwork
-from src.agent.a2c.memory import Memory
 from src.utils.utils import HyperParams, FilePaths, Utils
 
+from torch_geometric.utils.convert import from_networkx
 from torch.distributions import MultivariateNormal
 from torch_geometric.data import Data
 from torch.nn import functional as F
@@ -11,7 +11,6 @@ from torch import nn
 
 from typing import Tuple, List
 from collections import namedtuple
-from karateclub import GL2Vec
 
 import networkx as nx
 
@@ -43,11 +42,6 @@ class ActorCritic(nn.Module):
         self.device = torch.device(
             'cuda:0' if torch.cuda.is_available() else 'cpu')
         
-        # Embedding dimension == 128 by defualt
-        self.model = GL2Vec(dimensions=state_dim)
-        # print("* Start Fit Graph Embedding")
-        self.model.fit([graph])
-        # print("* End Fit Graph Embedding")
 
     def forward(self, graph: nx.Graph, jitter=1e-20) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -65,13 +59,15 @@ class ActorCritic(nn.Module):
         Tuple[torch.Tensor, torch.Tensor]
             Tuple of concentration and value
         """
-        # Compute embedding
-        state = torch.tensor(self.model.infer([graph])).to(self.device)
+        # Convert graph to torch_geometric.data.Data
+        state = from_networkx(graph).to(self.device)
+
         # Actor
-        probs = self.actor(state)
-        # Adds jitter to ensure numerical stability
-        # Use softplus to ensure concentration is positive
+        probs = self.actor(state)        
+        # Use softplus to ensure concentration is positive, then add jitter to 
+        # ensure numerical stability
         concentration = F.softplus(probs).reshape(-1) + jitter
+
         # Critic
         value = self.critic(state)
         return concentration, value

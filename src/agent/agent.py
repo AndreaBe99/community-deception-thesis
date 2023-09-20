@@ -10,6 +10,7 @@ from torch_geometric.data import Data
 from torch.nn import functional as F
 
 import networkx as nx
+import numpy as np
 import torch
 import json
 import gc
@@ -61,24 +62,25 @@ class Agent:
         """
         # ° ----- Environment ----- ° #
         self.env = env
-        
+
         # ° ----- A2C ----- ° #
-        self.state_dim = state_dim
+        self.state_dim = state_dim # self.env.graph.number_of_nodes()
         self.hidden_size_1 = hidden_size_1
         self.hidden_size_2 = hidden_size_2
         self.action_dim = self.env.graph.number_of_nodes()
         self.policy = ActorCritic(
-            state_dim=state_dim,
-            hidden_size_1=hidden_size_1,
-            hidden_size_2=hidden_size_2,
+            state_dim=self.state_dim,
+            hidden_size_1=self.hidden_size_1,
+            hidden_size_2=self.hidden_size_2,
             action_dim=self.action_dim,
             graph=self.env.graph
         )
         # Set device
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
         # Move model to device
         self.policy.to(self.device)
-        
+
         # ° ----- Hyperparameters ----- ° #
         # A2C hyperparameters
         self.lr_list = lr
@@ -101,17 +103,21 @@ class Agent:
         self.episode_reward = 0
         # Boolean variable to check if the episode is ended
         self.done = False
+        # Boolean variable to check if the goal is reached
+        self.goal = False
         # Number of steps in the episode
         self.step = 0
         # Tuple to store the values for each action
         self.SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
         self.saved_actions = []
         self.rewards = []
+        # List of rewards for one episode
+        self.episode_rewards = []
         # Initialize lists for logging, it contains: avg_reward, avg_steps per episode
         self.log_dict = HyperParams.LOG_DICT.value
         # Print agent info
         self.print_agent_info()
-        
+
         # ° ----- Evaluation ----- ° #
         # List of actions performed during the evaluation
         self.action_list = {"ADD": [], "REMOVE": []}
@@ -120,12 +126,12 @@ class Agent:
     #                       PRE-TRAINING/TESTING                               #
     ############################################################################
     def reset_hyperparams(
-        self, 
-        lr: float, 
-        gamma: float, 
-        lambda_metric: float, 
-        alpha_metric: float,
-        test: bool = False) -> None:
+            self,
+            lr: float,
+            gamma: float,
+            lambda_metric: float,
+            alpha_metric: float,
+            test: bool = False) -> None:
         """
         Reset hyperparameters
         
@@ -149,7 +155,8 @@ class Agent:
         self.env.lambda_metric = lambda_metric
         self.env.alpha_metric = alpha_metric
         # Print hyperparameters if we are not testing
-        if not test: self.print_hyperparams()
+        if not test:
+            self.print_hyperparams()
         # Clear logs, except for the training episodes
         for key in self.log_dict.keys():
             if key != 'train_episodes':
@@ -157,10 +164,12 @@ class Agent:
         # Clear action list
         self.saved_actions = []
         self.rewards = []
+        self.episode_rewards = []
         # Clear state
         self.obs = None
         self.episode_reward = 0
         self.done = False
+        self.goal = False
         self.step = 0
         self.optimizers = dict()
 
@@ -179,7 +188,7 @@ class Agent:
             actor_params, lr=self.lr)
         self.optimizers['c_optimizer'] = torch.optim.Adam(
             critic_params, lr=self.lr)
-    
+
     ############################################################################
     #                            GRID SEARCH                                   #
     ############################################################################
@@ -190,7 +199,8 @@ class Agent:
                 for lambda_metric in self.lambda_metrics:
                     for alpha_metric in self.alpha_metrics:
                         # Change Hyperparameters
-                        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric)
+                        self.reset_hyperparams(
+                            lr, gamma, lambda_metric, alpha_metric)
                         # Configure optimizers with the current learning rate
                         self.configure_optimizers()
                         # Training
@@ -219,18 +229,14 @@ class Agent:
         epochs = trange(episode)  # epoch iterator
         self.policy.train()  # set model in train mode
         for i_episode in epochs:
-            # if i_episode == 0:
-            #    pass
-            # elif i_episode % 1000 == 0:
-                # Change target community and target node
             self.env.change_target_community()
-            # elif i_episode % 100 == 0:
-            #    self.env.change_target_node()
-            
+
             # Reset environment, original graph, and new set of possible actions
             self.obs = self.env.reset()
             self.episode_reward = 0
             self.done = False
+            self.goal = False
+            self.episode_rewards = []
             self.step = 0
             # Rewiring the graph until the target node is isolated from the
             # target community
@@ -238,24 +244,36 @@ class Agent:
                 self.rewiring()
             # perform on-policy backpropagation
             self.a_loss, self.v_loss = self.training_step()
-            # Send current statistics to screen
-            epochs.set_description(
-                f"* Episode {i_episode+1} " +
-                f"| Avg Reward: {self.episode_reward/self.step:.2f} " +
-                f"| Avg Steps: {self.step} " +
-                f"| Actor Loss: {self.a_loss:.2f} " +
-                f"| Critic Loss: {self.v_loss:.2f}")
             # Checkpoint best performing model
             if self.episode_reward / self.step >= self.best_reward:
                 self.save_checkpoint()
                 self.best_reward = self.episode_reward
-            # Log
+
+            # ° Log
+            # Get the list of reward of the last self.step steps
+            rewards = self.episode_rewards[-self.step:]
+            # If the goal is reached, multiply the last reward by 10
+            if self.goal:
+                rewards[-1] *= 10
+            self.log_dict['train_reward_list'].append(rewards)
+            self.log_dict['train_reward_mul'].append(sum(rewards)/len(rewards))
+
             self.log_dict['train_reward'].append(self.episode_reward)
             self.log_dict['train_steps'].append(self.step)
             self.log_dict['train_avg_reward'].append(
                 self.episode_reward/self.step)
             self.log_dict['a_loss'].append(self.a_loss)
             self.log_dict['v_loss'].append(self.v_loss)
+
+            # Send current statistics to screen
+            epochs.set_description(
+                f"* Episode {i_episode+1} " +
+                f"| Mul Reward: {sum(rewards)/len(rewards):.2f}"
+                f"| Avg Reward: {self.episode_reward/self.step:.2f} " +
+                f"| Steps: {self.step} " +
+                f"| Actor Loss: {self.a_loss:.2f} " +
+                f"| Critic Loss: {self.v_loss:.2f}")
+            del rewards
         return self.log_dict
 
     def rewiring(self, test=False) -> None:
@@ -280,12 +298,16 @@ class Agent:
                 if self.env.graph.has_edge(*edge):
                     self.action_list["REMOVE"].append(edge)
         # Take action in environment
-        self.obs, reward, self.done = self.env.step(action_rl)
-        # Update reward
+        self.obs, reward, self.done, self.goal = self.env.step(action_rl)
+
+        # Update ra_losseward
         self.episode_reward += reward
-        # Store the transition in memory
+        # Store the transition in memory, used for the training step
         self.rewards.append(reward)
+        # Used for logging
+        self.episode_rewards.append(reward)
         self.step += 1
+        # print("STEP", self.step, "  GOAL:", self.goal, "  DONE:", self.done, "  REWARD:", reward)
 
     def select_action(self, state: Data) -> int:
         """
@@ -370,25 +392,27 @@ class Agent:
     #                               TEST                                       #
     ############################################################################
     def test(
-        self, 
-        lr: float, 
-        gamma: float, 
-        lambda_metric: float, 
-        alpha_metric: float) -> nx.Graph:
+            self,
+            lr: float,
+            gamma: float,
+            lambda_metric: float,
+            alpha_metric: float,
+            model_path: str,
+            graph_reset=True) -> nx.Graph:
         """Hide a given node from a given community"""
         # Set hyperparameters to select the correct folder
         self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric, True)
         # Load best performing model
-        self.load_checkpoint()
+        self.load_checkpoint(path=model_path)
         # Set model in evaluation mode
         self.policy.eval()
-        self.obs = self.env.reset()
+        self.obs = self.env.reset(graph_reset)
         # Rewiring the graph until the target node is isolated from the
         # target community
         while not self.done and self.step < self.env.max_steps:
             self.rewiring(test=True)
-        if self.step >= self.env.max_steps:
-            print("* !!!Maximum number of steps reached!!!")
+        # if self.step >= self.env.max_steps:
+        #     print("* !!!Maximum number of steps reached!!!")
         return self.obs
 
     ############################################################################
@@ -408,7 +432,7 @@ class Agent:
             f"lr-{self.lr}/gamma-{self.gamma}/" +\
             f"lambda-{self.env.lambda_metric}/alpha-{self.env.alpha_metric}"
         return file_path
-    
+
     def save_plots(self, log: dict, file_path: str) -> None:
         """
         Save training plots and logs
@@ -422,11 +446,6 @@ class Agent:
         """
         Utils.check_dir(file_path)
         self.log(log)
-        # Utils.save_training(
-        #     log,
-        #     self.env.env_name,
-        #     self.env.detection_alg,
-        #     file_path)
         Utils.plot_training(
             log,
             self.env.env_name,
@@ -445,11 +464,13 @@ class Agent:
         path = f'{log_dir}/model.pth'
         torch.save(checkpoint, path)
 
-    def load_checkpoint(self):
+    def load_checkpoint(self, path=None):
         """Load checkpoint"""
-        log_dir = self.get_path()
-        path = f'{log_dir}/model.pth'
-        checkpoint = torch.load(path)
+        if path is None:
+            log_dir = self.get_path()
+            path = f'{log_dir}/model.pth'
+        
+        checkpoint = torch.load(path, map_location=self.device)
         self.policy.load_state_dict(checkpoint['model'])
         for key, _ in self.optimizers.items():
             self.optimizers[key].load_state_dict(checkpoint[key])
@@ -467,14 +488,15 @@ class Agent:
         file_name = f'{log_dir}/training_results.json'
         with open(file_name, "w", encoding="utf-8") as f:
             json.dump(log_dict, f, indent=4)
-    
+
     ############################################################################
     #                   AGENT INFO AND PRINTING                                #
     ############################################################################
     def print_agent_info(self):
         # Print model architecture
         print("*", "-"*18, " Model Architecture ", "-"*18)
-        print("* Embedding dimension: ", self.state_dim)
+        # print("* Embedding dimension: ", self.state_dim)
+        print("* Features vector size: ", self.state_dim)
         print("* A2C Hidden layer 1 size: ", self.hidden_size_1)
         print("* A2C Hidden layer 2 size: ", self.hidden_size_2)
         print("* Actor Action dimension: ", self.action_dim)
@@ -486,7 +508,7 @@ class Agent:
         print("* Lambda Metric list: ", self.lambda_metrics)
         print("* Alpha Metric list: ", self.alpha_metrics)
         print("*", "-"*58, "\n")
-    
+
     def print_hyperparams(self):
         print("*", "-"*18, "Model Hyperparameters", "-"*18)
         print("* Learning rate: ", self.lr)

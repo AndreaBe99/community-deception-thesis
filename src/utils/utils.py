@@ -1,10 +1,13 @@
 from enum import Enum
 from typing import List, Tuple
+from statistics import mean
 # from src.environment.graph_env import GraphEnvironment
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import scipy
 import json
 import os
@@ -25,6 +28,9 @@ class FilePaths(Enum):
     # LOG_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Logs/"
     # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/"
     
+    # ! Trained model path for testing (change the following line to change the model)
+    TRAINED_MODEL = LOG_DIR + \
+        "lfr_benchmark_node-300/greedy/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/best_model.pth"
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'
     DOL = DATASETS_DIR + '/dol.mtx'
@@ -75,21 +81,23 @@ class SimilarityFunctionsNames(Enum):
 class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # ! REAL GRAPH Graph path (change the following line to change the graph)
-    GRAPH_NAME = FilePaths.DOL.value
+    GRAPH_NAME = FilePaths.KAR.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    DETECTION_ALG_NAME = DetectionAlgorithmsNames.INF.value
-    # Numeber of possible action with BETA=30, is 30% of the edges
-    BETA = 10
+    DETECTION_ALG_NAME = DetectionAlgorithmsNames.EIG.value
+    # Multiplier for the rewiring action number, i.e. (mean_degree * BETA)
+    BETA = 3
     # ! Strength of the deception constraint, value between 0 (hard) and 1 (soft) 
-    TAU = 0.3
+    TAU = 0.5
     # ° Hyperparameters  Testing ° #
     # ! Weight to balance the penalty in the reward
     # The higher its value the more importance the penalty will have
-    LAMBDA = [1] # [0.01, 0.1, 1]
+    LAMBDA = [0.1] # [0.01, 0.1, 1]
     # ! Weight to balance the two metrics in the definition of the penalty
     # The higher its value the more importance the distance between communities 
     # will have, compared with the distance between graphs
-    ALPHA = [0.9] # [0.3, 0.5, 0.7]
+    ALPHA = [0.7] # [0.3, 0.5, 0.7]
+    # Multiplier for the number of maximum steps allowed
+    MAX_STEPS_MUL = 2
     
     """ Graph Encoder Parameters """""
     EMBEDDING_DIM = 128 # 256
@@ -97,25 +105,31 @@ class HyperParams(Enum):
     """ Agent Parameters"""
     # Networl Architecture
     HIDDEN_SIZE_1 = 64
-    HIDDEN_SIZE_2 = 32
+    HIDDEN_SIZE_2 = 64
     # Hyperparameters for the ActorCritic
     EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
-    BEST_REWARD = 0.7  # -np.inf
+    BEST_REWARD = -np.inf
     # ° Hyperparameters  Testing ° #
     # ! Learning rate, it controls how fast the network learns
-    LR = [1e-2] # [1e-7, 1e-4, 1e-1]
+    LR = [1e-4] # [1e-7, 1e-4, 1e-1]
     # ! Discount factor
-    GAMMA = [0.3] # [0.9, 0.95]
+    GAMMA = [0.9] # [0.9, 0.95]
     
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 10
+    MAX_EPISODES = 1000
     # Dictonary for logging
     LOG_DICT = {
+        # List of rewards per episode
+        'train_reward_list': [],
+        # Avg reward per episode, with the last value multiplied per 10 if the 
+        # goal is reached
+        'train_reward_mul': [],
+        # Total reward per episode
         'train_reward': [],
         # Number of steps per episode
         'train_steps': [],
-        # Average reward per step
+        # Average reward per episode
         'train_avg_reward': [],
         # Average Actor loss per episode
         'a_loss': [],
@@ -132,46 +146,38 @@ class HyperParams(Enum):
     GAMMA_EVAL = GAMMA[0]
     LAMBDA_EVAL = LAMBDA[0]
     ALPHA_EVAL = ALPHA[0]
-    EVAL_DICT = {
-        "agent": {
-            "goal": [],
-            "nmi": [],
-            "time": [],
-            "steps": [],
-            "lr": None,
-            "gamma": None,
-            "lambda_metric": None,
-            "alpha_metric": None,
-        },
-        "rh": {
-            "goal": [],
-            "nmi": [],
-            "time": [],
-            "steps": [],
-        },
-        "dh": {
-            "goal": [],
-            "nmi": [],
-            "time": [],
-            "steps": [],
-        },
-        "di": {
-            "goal": [],
-            "nmi": [],
-            "time": [],
-            "steps": [],
-        },
-    }
+    # Algorithms to evaluate
+    ALGS_EVAL = ["Roam",  "Random", "Degree", "Agent"]
+    # Metrics for each algorithm
+    METRICS_EVAL = ["goal", "nmi", "time", "steps"]
     
     """Graph Generation Parameters"""
     # ! Change the following parameters to modify the graph
-    N_NODE = 1000
-    TAU1 = 3
-    TAU2 = 1.5
-    MU = 0.1             # TODO: Test also 0.3 and 0.6
-    AVERAGE_DEGREE = 5
-    MIN_COMMUNITY = 30
-    SEED= 10
+    # Number of nodes
+    N_NODE = 300
+    # Power law exponent for the degree distribution of the created graph.
+    TAU1 = 2
+    # Power law exponent for the community size distribution in the created graph.
+    TAU2 = 1.1
+    # Fraction of inter-community edges incident to each node.
+    MU = 0.1
+
+    # Desired average degree of nodes in the created graph.
+    AVERAGE_DEGREE = int(0.05 * N_NODE)  # 20
+    # Minimum degree of nodes in the created graph
+    MIN_DEGREE = None  # 30
+    # Maximum degree of nodes in the created graph
+    MAX_DEGREE = int(0.19 * N_NODE)
+
+    # Minimum size of communities in the graph.
+    MIN_COMMUNITY = int(0.05 * N_NODE)
+    # Maximum size of communities in the graph.
+    MAX_COMMUNITY = int(0.2 * N_NODE)
+
+    # Maximum number of iterations to try to create the community sizes, degree distribution, and community affiliations.
+    MAX_ITERS = 5000
+    # Seed for the random number generator.
+    SEED = 10
 
 
 class Utils:
@@ -209,9 +215,13 @@ class Utils:
         n: int=HyperParams.N_NODE.value,
         tau1: float=HyperParams.TAU1.value,
         tau2: float=HyperParams.TAU2.value,
-        mu: float=HyperParams.MU.value,              
-        average_degree: float=HyperParams.AVERAGE_DEGREE.value, 
-        min_community: int=HyperParams.MIN_COMMUNITY.value, 
+        mu: float=HyperParams.MU.value,   
+        average_degree: int = HyperParams.AVERAGE_DEGREE.value,
+        min_degree: int=HyperParams.MIN_DEGREE.value,
+        max_degree: int=HyperParams.MAX_DEGREE.value,
+        min_community: int=HyperParams.MIN_COMMUNITY.value,
+        max_community: int=HyperParams.MAX_COMMUNITY.value,
+        max_iters: int=HyperParams.MAX_ITERS.value,
         seed: int=HyperParams.SEED.value)->Tuple[nx.Graph, str]:
         """
         Generate a LFR benchmark graph for community detection algorithms.
@@ -219,19 +229,27 @@ class Utils:
         Parameters
         ----------
         n : int, optional
-            _description_, by default 250
+            Number of nodes, by default 500
         tau1 : float, optional
             _description_, by default 3
         tau2 : float, optional
-            _description_, by default 1.5
+            _description_
         mu : float, optional
-            _description_, by default 0.1
-        average_degree : float, optional
-            _description_, by default 5
+            Mixing parameter, by default 0.1
+        average_degree : int, optional
+            Average degree of the nodes, by default 20
+        min_degree : int, optional
+            Minimum degree of the nodes, by default 20
+        max_degree : int, optional
+            Maximum degree of the nodes, by default 50
         min_community : int, optional
-            _description_, by default 20
+            Minimum number of communities, by default 10
+        max_community : int, optional
+            Maximum number of communities, by default 50
+        max_iters : int, optional
+            Maximum number of iterations, by default 5000
         seed : int, optional
-            _description_, by default 10
+            Seed for the random number generator, by default 10
 
         Returns
         -------
@@ -246,9 +264,15 @@ class Utils:
             tau2=tau2,
             mu=mu,
             average_degree=average_degree,
+            min_degree=min_degree,
+            max_degree=max_degree,
             min_community=min_community,
+            max_community=max_community,
+            max_iters=max_iters,
             seed=seed)
-        file_path = FilePaths.DATASETS_DIR.value + f"/lfr_benchmark_mu-{mu}.mtx"
+        file_path = FilePaths.DATASETS_DIR.value + f"/lfr_benchmark_node-{n}.mtx"
+        # ! FOR KAGGLE NOTEBOOK
+        # file_path = f"/kaggle/working/lfr_benchmark_node-{n}.mtx"
         nx.write_edgelist(graph, file_path, data=False)
         # Delete community attribute from the nodes to handle PyG compatibility
         for node in graph.nodes:
@@ -293,82 +317,95 @@ class Utils:
         window_size : int, optional
             Size of the rolling window, by default 100
         """
-        def plot_time_series(
-            list_1: List[float],
-            list_2: List[float],
-            label_1: str,
-            label_2: str,
-            color_1: str,
-            color_2: str,
-            file_name: str):
-            _, ax1 = plt.subplots()
-            color = 'tab:'+color_1
-            ax1.set_xlabel("Episode")
-            ax1.set_ylabel(label_1, color=color)
-            ax1.plot(list_1, color=color)
-            ax1.tick_params(axis='y', labelcolor=color)
-
-            ax2 = ax1.twinx()
-            color = 'tab:'+color_2
-            ax2.set_ylabel(label_2, color=color)
-            ax2.plot(list_2, color=color)
-            ax2.tick_params(axis='y', labelcolor=color)
-
+        def plot_seaborn(
+                df: pd.DataFrame,
+                path: str,
+                env_name: str,
+                detection_algorithm: str,
+                labels: Tuple[str, str],
+                colors: Tuple[str, str]) -> None:
+            sns.set_style("darkgrid")
+            sns.lineplot(data=df, x="Episode", y=labels[0], color=colors[0])
+            sns.lineplot(data=df, x="Episode", y=labels[1], color=colors[1],
+                        estimator="mean", errorbar=None)
             plt.title(
                 f"Training on {env_name} graph with {detection_algorithm} algorithm")
-            plt.savefig(file_name)
-            # plt.show()
-        
-        plot_time_series(
-            log['train_avg_reward'],
-            log['train_steps'],
-            'Avg Reward',
-            'Steps per Epoch',
-            'blue',
-            'orange',
-            file_path+"/training_reward.png",
-        )
-        plot_time_series(
-            log["a_loss"],
-            log["v_loss"],
-            'Actor Loss',
-            'Critic Loss',
-            'green',
-            'red',
-            file_path+"/training_loss.png",
-        )
+            plt.xlabel("Episode")
+            plt.ylabel(labels[0])
+            plt.savefig(path)
+            plt.clf()
         
         if window_size < 1:
             window_size = 1
-        # Compute the rolling windows of the time series data using NumPy
-        rolling_data_1 = np.convolve(np.array(log["train_avg_reward"]),
-            np.ones(window_size) / window_size, mode='valid')
-        rolling_data_2 = np.convolve(np.array(log["train_steps"]), 
-            np.ones(window_size) / window_size, mode='valid')
-        plot_time_series(
-            rolling_data_1,
-            rolling_data_2,
-            'Avg Reward',
-            'Steps per Epoch',
-            'blue',
-            'orange',
-            file_path+"/training_rolling_reward.png",
+        df = pd.DataFrame({
+            "Episode": range(len(log["train_avg_reward"])),
+            "Avg Reward": log["train_avg_reward"],
+            "Steps per Epoch": log["train_steps"],
+            "Goal Reward": log["train_reward_mul"],
+            "Goal Reached": [1/log["train_steps"][i] if log["train_reward_list"][i][-1]
+                > 1 else 0 for i in range(len(log["train_steps"]))],
+        })
+        df["Rolling_Avg_Reward"] = df["Avg Reward"].rolling(window_size).mean()
+        df["Rolling_Steps"] = df["Steps per Epoch"].rolling(window_size).mean()
+        df["Rolling_Goal_Reward"] = df["Goal Reward"].rolling(window_size).mean()
+        df["Rolling_Goal_Reached"] = df["Goal Reached"].rolling(window_size).mean()
+        plot_seaborn(
+            df,
+            file_path+"/training_reward.png",
+            env_name,
+            detection_algorithm,
+            ("Avg Reward", "Rolling_Avg_Reward"),
+            ("lightsteelblue", "darkblue"),
         )
-        # Compute the rolling windows of the time series data using NumPy
-        rolling_data_1 = np.convolve(np.array(log["a_loss"]), 
-            np.ones(window_size) / window_size, mode='valid')
-        rolling_data_2 = np.convolve(np.array(log["v_loss"]), 
-            np.ones(window_size) / window_size, mode='valid')
-        plot_time_series(
-            rolling_data_1,
-            rolling_data_2,
-            'Actor Loss',
-            'Critic Loss',
-            'green',
-            'red',
-            file_path+"/training_rolling_loss.png",
+        plot_seaborn(
+            df,
+            file_path+"/training_steps.png",
+            env_name,
+            detection_algorithm,
+            ("Steps per Epoch", "Rolling_Steps"),
+            ("thistle", "purple"),
         )
-        
+        plot_seaborn(
+            df,
+            file_path+"/training_goal_reward.png",
+            env_name,
+            detection_algorithm,
+            ("Goal Reward", "Rolling_Goal_Reward"),
+            ("darkgray", "black"),
+        )
+        plot_seaborn(
+            df,
+            file_path+"/training_goal_reached.png",
+            env_name,
+            detection_algorithm,
+            ("Goal Reached", "Rolling_Goal_Reached"),
+            ("darkgray", "black"),
+        )
+
+        df = pd.DataFrame({
+            "Episode": range(len(log["a_loss"])),
+            "Actor Loss": log["a_loss"],
+            "Critic Loss": log["v_loss"],
+        })
+        df["Rolling_Actor_Loss"] = df["Actor Loss"].rolling(window_size).mean()
+        df["Rolling_Critic_Loss"] = df["Critic Loss"].rolling(window_size).mean()
+        plot_seaborn(
+            df,
+            file_path+"/training_a_loss.png",
+            env_name,
+            detection_algorithm,
+            ("Actor Loss", "Rolling_Actor_Loss"),
+            ("palegreen", "darkgreen"),
+        )
+        plot_seaborn(
+            df,
+            file_path+"/training_v_loss.png",
+            env_name,
+            detection_algorithm,
+            ("Critic Loss", "Rolling_Critic_Loss"),
+            ("lightcoral", "darkred"),
+        )
+
         
     ############################################################################
     #                               EVALUATION                                 #
@@ -444,9 +481,40 @@ class Utils:
             return 1
         return 0
 
+    @staticmethod
+    def initialize_dict(algs: List[str])->dict:
+        """
+        Initialize the dictionary for the evaluation
+
+        Parameters
+        ----------
+        algs : List[str]
+            List of algorithms names to evaluate
+        
+        Returns
+        -------
+        dict
+            Dictionary for the evaluation, where the keys are the algorithms
+            names and the values are dictionaries containing the metrics
+        """
+        log_dict = dict()
+        
+        for alg in algs:
+            log_dict[alg] = {
+                "goal": [],
+                "nmi": [],
+                "time": [],
+                "steps": [],
+            }
+        return log_dict
     
     @staticmethod
-    def save_test(log: dict, files_path: str):
+    def save_test(
+        log: dict, 
+        files_path: str, 
+        log_name: str, 
+        algs: List[str],
+        metrics: List[str]):
         """Save and Plot the testing results
 
         Parameters
@@ -455,30 +523,41 @@ class Utils:
             Dictionary containing the training logs
         files_path : str
             Path to save the plot
+        log_name : str
+            Name of the log file
+        algs : List[str]
+            List of algorithms names to evaluate
+        metrics : List[str]
+            List of metrics to evaluate
         """
-        file_name = f"{files_path}/evaluation_results.json"
+        file_name = f"{files_path}/{log_name}.json"
         # Save json file
         with open(file_name, "w", encoding="utf-8") as f:
             json.dump(log, f, indent=4)
-        
-        # Plot the results
-        # Algorithms
-        list_algs = ["rh", "dh", "di", "agent"]
-        colors = ["red", "green", "orange", "blue"]
-        marker = ["+", "x", "*", "o"]
-        # Metrics for each algorithm
-        metrics = ["goal", "nmi", "time", "steps"]
+            
         for metric in metrics:
-            fig, ax = plt.subplots()
-            ax.set_title(metric)
-            for i, alg in enumerate(list_algs):
-                # ax.plot(log[alg][metric], label=alg)
-                ax.scatter(
-                    range(len(log[alg][metric])),
-                    log[alg][metric], 
-                    marker=marker[i],
-                    label=alg,
-                    c=colors[i])
-            ax.legend()
-            plt.savefig(f"{files_path}/{metric}.png")
+            # Create a DataFrame with the mean values of each algorithm for the metric
+            df = pd.DataFrame({
+                "Algorithm": algs,
+                metric.capitalize(): [mean(log[alg][metric]) for alg in algs]
+            })
+            
+            # Convert the goal column to percentage
+            if metric == "goal":
+                df[metric.capitalize()] = df[metric.capitalize()] * 100
+
+            sns.barplot(data=df,
+                        x="Algorithm",
+                        y=metric.capitalize(),
+                        palette=sns.color_palette("Set1"))
+            plt.title(f"Evaluation on {log['env']['dataset']} graph with {log['env']['detection_alg']} algorithm")
+            plt.xlabel("Algorithm")
+            if metric == "goal":
+                plt.ylabel(f"{metric.capitalize()} reached %")
+            elif metric == "time":
+                plt.ylabel(f"{metric.capitalize()} (s)")
+            else:
+                plt.ylabel(metric.capitalize())
+            plt.savefig(f"{files_path}/{log_name}_{metric}.png")
+            plt.clf()
 

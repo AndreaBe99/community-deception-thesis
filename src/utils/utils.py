@@ -33,19 +33,32 @@ class FilePaths(Enum):
         "lfr_benchmark_node-300/greedy/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/best_model.pth"
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'
+    # KAR = DATASETS_DIR + '/kar.gml'
     DOL = DATASETS_DIR + '/dol.mtx'
+    # DOL = DATASETS_DIR + '/dol.gml'
     MAD = DATASETS_DIR + '/mad.mtx'
+    # MAD = DATASETS_DIR + '/mad.gml'
     LESM = DATASETS_DIR + '/lesm.mtx'
+    # LESM = DATASETS_DIR + '/lesm.gml'
     POLB = DATASETS_DIR + '/polb.mtx'
+    # POLB = DATASETS_DIR + '/polb.gml'
     WORDS = DATASETS_DIR + '/words.mtx'
+    # WORDS = DATASETS_DIR + '/words.gml'
+    NETS = DATASETS_DIR + '/nets.mtx'
+    # NETS = DATASETS_DIR + '/nets.gml'
     ERDOS = DATASETS_DIR + '/erdos.mtx'
+    # ERDOS = DATASETS_DIR + '/erdos.gml'
     POW = DATASETS_DIR + '/pow.mtx'
+    # POW = DATASETS_DIR + '/pow.gml'
     FB_75 = DATASETS_DIR + '/fb-75.mtx'
-    DBLP = DATASETS_DIR + '/dblp.mtx'
-    ASTR = DATASETS_DIR + '/astr.mtx'
-    AMZ = DATASETS_DIR + '/amz.mtx'
-    YOU = DATASETS_DIR + '/you.mtx'
-    ORK = DATASETS_DIR + '/ork.mtx'
+    # FB_75 = DATASETS_DIR + '/fb-75.gml'
+    
+    # The following datasets are too big, scipy cannot load them
+    # DBLP = DATASETS_DIR + '/dblp.mtx'
+    # ASTR = DATASETS_DIR + '/astr.mtx'
+    # AMZ = DATASETS_DIR + '/amz.mtx'
+    # YOU = DATASETS_DIR + '/you.mtx'
+    # ORK = DATASETS_DIR + '/ork.mtx'
 
 
 class DetectionAlgorithmsNames(Enum):
@@ -199,8 +212,15 @@ class Utils:
             Graph imported from the .mtx file
         """
         try:
-            graph_matrix = scipy.io.mmread(file_path)
-            graph = nx.Graph(graph_matrix)
+            # Check if the graph file is in the .mtx format or .gml
+            if file_path.endswith(".mtx"):
+                graph_matrix = scipy.io.mmread(file_path)
+                graph = nx.Graph(graph_matrix)
+            elif file_path.endswith(".gml"):
+                graph = nx.read_gml(file_path)
+            else:
+                raise ValueError("File format not supported")
+
             for node in graph.nodes:
                 # graph.nodes[node]['name'] = node
                 graph.nodes[node]['num_neighbors'] = len(
@@ -270,10 +290,15 @@ class Utils:
             max_community=max_community,
             max_iters=max_iters,
             seed=seed)
-        file_path = FilePaths.DATASETS_DIR.value + f"/lfr_benchmark_node-{n}.mtx"
+        # Save the graph in a .mtx file
+        file_path = FilePaths.DATASETS_DIR.value + f"/lfr_benchmark_node-{n}"
         # ! FOR KAGGLE NOTEBOOK
         # file_path = f"/kaggle/working/lfr_benchmark_node-{n}.mtx"
-        nx.write_edgelist(graph, file_path, data=False)
+        # Write .gml file
+        nx.write_gml(graph, f"{file_path}.gml")
+        # Write .mtx file
+        nx.write_edgelist(graph, f"{file_path}.mtx", data=False)
+        
         # Delete community attribute from the nodes to handle PyG compatibility
         for node in graph.nodes:
             if 'community' in graph.nodes[node]:

@@ -1,8 +1,11 @@
 """Module for calculating deception score of a community detection algorithm."""
 from typing import List
+import numpy as np
+import networkx as nx
 
 class DeceptionScore(object):
     """Deception score of a community detection algorithm."""
+
     def __init__(self, community_target: List[int]) -> None:
         self.community_target = community_target
 
@@ -42,6 +45,7 @@ class DeceptionScore(object):
         members_in_g_i = len(set(community_target) & set(g_i))
         return members_in_g_i / len(g_i)
 
+    @DeprecationWarning
     def compute_deception_score(
             self,
             community_structure: List[List[int]],
@@ -81,6 +85,48 @@ class DeceptionScore(object):
         # Deception score is the product of community spread and community hiding. 
         deception_score = community_spread * community_hiding
         return deception_score
+    
+    # TEST
+    def get_deception_score(self, graph, community_structure: List[List[int]]):
+        """
+        New version of the deception score, based on the repository:
+            - https://github.com/vfionda/BHC/tree/main
+
+        Parameters
+        ----------
+        community_structure : List[List[int]]
+            _description_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        number_communities = len(community_structure)
+        
+        # Number of the target community members in the various communities
+        member_for_community = np.zeros(number_communities, dtype=int)
+        
+        for i in range(number_communities):
+            for node in community_structure[i]:
+                if node in self.community_target:
+                    member_for_community[i] += 1
+        
+        # ratio of the targetCommunity members in the various communities
+        ratio_community_members = [members_for_c/len(com) for (members_for_c, com) in zip(member_for_community, community_structure)]
+        
+        # In how many commmunities are the members of the target spread?
+        spread_members = sum([1 if mc > 0 else 0 for mc in member_for_community])
+        
+        second_part = 1 / 2 * ((spread_members - 1) / number_communities) + \
+            1/2 * (1 - sum(ratio_community_members) / spread_members)
+        
+        # induced subraph sonly on target community nodes
+        num_components = nx.number_connected_components(
+            graph.subgraph(self.community_target))
+        first_part = 1 - ((num_components - 1) / (len(self.community_target) - 1))
+        dec_score = first_part * second_part
+        return dec_score
 
 
 if __name__ == "__main__":

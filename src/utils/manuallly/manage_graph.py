@@ -11,7 +11,7 @@ path = f"../../dataset/data/{name}.gml"
 # G = nx.Graph(graph_matrix)
 
 # Load the graph
-G = nx.read_gml(path)
+G = nx.read_gml(path, label='id')
 
 print("Number of nodes: ", G.number_of_nodes())
 print("Number of edges: ", G.number_of_edges())

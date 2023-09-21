@@ -5,7 +5,7 @@ from src.utils.utils import DetectionAlgorithmsNames, Utils
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
 
 import networkx as nx
-from typing import List
+from typing import List, Callable
 import random
 
 
@@ -23,11 +23,8 @@ class DegreeHiding():
         self.target_community = target_community
         self.detection_alg = self.env.detection
         self.original_community_structure = self.env.original_community_structure
-        self.possible_edges = self.get_possible_action()  # self.env.possible_actions
-        # Put all the edges in a list
-        # self.possible_edges = self.env.possible_actions
-        # self.possible_edges = list(self.possible_edges["ADD"]) + list(self.possible_edges["REMOVE"])
-
+        self.possible_edges = self.get_possible_action()
+        
     def get_possible_action(self):
         # Put all edge between the target node and its neighbors in a list
         possible_actions_add = []
@@ -74,14 +71,74 @@ class DegreeHiding():
 
             # Compute the new community structure
             communities = self.detection_alg.compute_community(graph)
-            new_community = Utils.get_new_community(self.target_node, communities)
+            new_community = self.get_new_community(communities)
 
-            check = Utils.check_goal(self.env, self.target_node, self.target_community, new_community)
+            check = self.check_goal(new_community)
             if check == 1:
                 # If the target community is a subset of the new community, the episode is finished
                 done = True
             self.steps -= 1
         return graph, communities
+    
+    def get_new_community(
+                self,
+                new_community_structure: List[List[int]]) -> List[int]:
+        """
+        Search the community target in the new community structure after 
+        deception. As new community target after the action, we consider the 
+        community that contains the target node, if this community satisfies 
+        the deception constraint, the episode is finished, otherwise not.
+
+        Parameters
+        ----------
+        node_target : int
+            Target node to be hidden from the community
+        new_community_structure : List[List[int]]
+            New community structure after deception
+
+        Returns
+        -------
+        List[int]
+            New community target after deception
+        """
+        if new_community_structure is None:
+            # The agent did not perform any rewiring, i.e. are the same communities
+            return self.target_community
+        for community in new_community_structure.communities:
+            if self.target_node in community:
+                return community
+        raise ValueError("Community not found")
+
+    def check_goal(self, new_community: int) -> int:
+        """
+        Check if the goal of hiding the target node was achieved
+
+        Parameters
+        ----------
+        new_community : int
+            New community of the target node
+
+        Returns
+        -------
+        int
+            1 if the goal was achieved, 0 otherwise
+        """
+        if len(new_community) == 1:
+            return 1
+        # Copy the communities to avoid modifying the original ones
+        new_community_copy = new_community.copy()
+        new_community_copy.remove(self.target_node)
+        old_community_copy = self.target_community.copy()
+        old_community_copy.remove(self.target_node)
+        # Compute the similarity between the new and the old community
+        similarity = self.env.community_similarity(
+            new_community_copy,
+            old_community_copy
+        )
+        del new_community_copy, old_community_copy
+        if similarity <= self.env.tau:
+            return 1
+        return 0
 
 
 # Example usage:

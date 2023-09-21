@@ -168,6 +168,7 @@ class Agent:
         # Clear state
         self.obs = None
         self.episode_reward = 0
+        self.best_reward = HyperParams.BEST_REWARD.value
         self.done = False
         self.goal = False
         self.step = 0
@@ -229,8 +230,9 @@ class Agent:
         epochs = trange(episode)  # epoch iterator
         self.policy.train()  # set model in train mode
         for i_episode in epochs:
-            self.env.change_target_community()
-
+            # Print node_target and community_target
+            # print("* Node target:", self.env.node_target)
+            # print("* Community target:", self.env.community_target)
             # Reset environment, original graph, and new set of possible actions
             self.obs = self.env.reset()
             self.episode_reward = 0
@@ -238,10 +240,12 @@ class Agent:
             self.goal = False
             self.episode_rewards = []
             self.step = 0
+            
             # Rewiring the graph until the target node is isolated from the
             # target community
             while not self.done and self.step < self.env.max_steps:
                 self.rewiring()
+                
             # perform on-policy backpropagation
             self.a_loss, self.v_loss = self.training_step()
             # Checkpoint best performing model
@@ -297,6 +301,7 @@ class Agent:
             elif edge in self.env.possible_actions["REMOVE"]:
                 if self.env.graph.has_edge(*edge):
                     self.action_list["REMOVE"].append(edge)
+        
         # Take action in environment
         self.obs, reward, self.done, self.goal = self.env.step(action_rl)
 
@@ -309,14 +314,14 @@ class Agent:
         self.step += 1
         # print("STEP", self.step, "  GOAL:", self.goal, "  DONE:", self.done, "  REWARD:", reward)
 
-    def select_action(self, state: Data) -> int:
+    def select_action(self, state: nx.Graph) -> int:
         """
         Select action, given a state, using the policy network.
         
         Parameters
         ----------
-        state : Data
-            Graph state
+        state : nx.Graph
+            Current state of the environment
         
         Returns
         -------

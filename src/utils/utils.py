@@ -30,7 +30,8 @@ class FilePaths(Enum):
     
     # ! Trained model path for testing (change the following line to change the model)
     TRAINED_MODEL = LOG_DIR + \
-        "lfr_benchmark_node-300/greedy/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/best_model.pth"
+        "kar/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
+
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'
     # KAR = DATASETS_DIR + '/kar.gml'
@@ -44,8 +45,8 @@ class FilePaths(Enum):
     # POLB = DATASETS_DIR + '/polb.gml'
     WORDS = DATASETS_DIR + '/words.mtx'
     # WORDS = DATASETS_DIR + '/words.gml'
-    NETS = DATASETS_DIR + '/nets.mtx'
-    # NETS = DATASETS_DIR + '/nets.gml'
+    # NETS = DATASETS_DIR + '/nets.mtx'
+    NETS = DATASETS_DIR + '/nets.gml'
     ERDOS = DATASETS_DIR + '/erdos.mtx'
     # ERDOS = DATASETS_DIR + '/erdos.gml'
     POW = DATASETS_DIR + '/pow.mtx'
@@ -65,12 +66,12 @@ class DetectionAlgorithmsNames(Enum):
     """
     Enum class for the detection algorithms
     """
-    LOUV = "louvain"
-    WALK = "walktrap"
-    GRE = "greedy"
-    INF = "infomap"
+    LOUV = "louvain"            # ! NOT WORKING with: NETS (each community is a single node)
+    WALK = "walktrap"           # ! NOT WORKING with: NETS (bipartite graphs)
+    GRE = "greedy"              # ! NOT WORKING with: NETS (division by 0)
+    INF = "infomap"             # ! NOT WORKING with: NETS (each community is a single node)
     LAB = "label_propagation"
-    EIG = "eigenvector"
+    EIG = "eigenvector"         # ! NOT WORKING with: NETS (bipartite graphs)
     BTW = "edge_betweenness"
     SPIN = "spinglass"
     OPT = "optimal"
@@ -96,7 +97,7 @@ class HyperParams(Enum):
     # ! REAL GRAPH Graph path (change the following line to change the graph)
     GRAPH_NAME = FilePaths.KAR.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    DETECTION_ALG_NAME = DetectionAlgorithmsNames.EIG.value
+    DETECTION_ALG_NAME = DetectionAlgorithmsNames.INF.value
     # Multiplier for the rewiring action number, i.e. (mean_degree * BETA)
     BETA = 3
     # ! Strength of the deception constraint, value between 0 (hard) and 1 (soft) 
@@ -125,8 +126,10 @@ class HyperParams(Enum):
     # ° Hyperparameters  Testing ° #
     # ! Learning rate, it controls how fast the network learns
     LR = [1e-4] # [1e-7, 1e-4, 1e-1]
-    # ! Discount factor
-    GAMMA = [0.9] # [0.9, 0.95]
+    # ! Discount factor:
+    # - 0: only the reward on the next step is important
+    # - 1: a reward in the future is as important as a reward on the next step
+    GAMMA = [0.7] # [0.9, 0.95]
     
     """ Training Parameters """
     # Number of episodes to collect experience
@@ -154,7 +157,7 @@ class HyperParams(Enum):
     
     """Evaluation Parameters"""
     # ! Change the following parameters according to the hyperparameters to test
-    STEPS_EVAL = 1000
+    STEPS_EVAL = 100
     LR_EVAL = LR[0]
     GAMMA_EVAL = GAMMA[0]
     LAMBDA_EVAL = LAMBDA[0]
@@ -167,7 +170,7 @@ class HyperParams(Enum):
     """Graph Generation Parameters"""
     # ! Change the following parameters to modify the graph
     # Number of nodes
-    N_NODE = 300
+    N_NODE = 500
     # Power law exponent for the degree distribution of the created graph.
     TAU1 = 2
     # Power law exponent for the community size distribution in the created graph.
@@ -211,24 +214,24 @@ class Utils:
         nx.Graph
             Graph imported from the .mtx file
         """
-        try:
-            # Check if the graph file is in the .mtx format or .gml
-            if file_path.endswith(".mtx"):
-                graph_matrix = scipy.io.mmread(file_path)
-                graph = nx.Graph(graph_matrix)
-            elif file_path.endswith(".gml"):
-                graph = nx.read_gml(file_path)
-            else:
-                raise ValueError("File format not supported")
+        # try:
+        # Check if the graph file is in the .mtx format or .gml
+        if file_path.endswith(".mtx"):
+            graph_matrix = scipy.io.mmread(file_path)
+            graph = nx.Graph(graph_matrix)
+        elif file_path.endswith(".gml"):
+            graph = nx.read_gml(file_path, label='id')
+        else:
+            raise ValueError("File format not supported")
 
-            for node in graph.nodes:
-                # graph.nodes[node]['name'] = node
-                graph.nodes[node]['num_neighbors'] = len(
-                    list(graph.neighbors(node)))
-            return graph
-        except Exception as exception:
-            print("Error: ", exception)
-            return None
+        for node in graph.nodes:
+            # graph.nodes[node]['name'] = node
+            graph.nodes[node]['num_neighbors'] = len(
+                list(graph.neighbors(node)))
+        return graph
+        # except Exception as exception:
+        #     print("Error: ", exception)
+        #     return None
     
     @staticmethod
     def generate_lfr_benchmark_graph(
@@ -435,104 +438,6 @@ class Utils:
     ############################################################################
     #                               EVALUATION                                 #
     ############################################################################   
-    @staticmethod   
-    def get_new_community(
-        node_target: int,
-        new_community_structure: List[List[int]]) -> List[int]:
-        """
-        Search the community target in the new community structure after 
-        deception. As new community target after the action, we consider the 
-        community that contains the target node, if this community satisfies 
-        the deception constraint, the episode is finished, otherwise not.
-
-        Parameters
-        ----------
-        node_target : int
-            Target node to be hidden from the community
-        new_community_structure : List[List[int]]
-            New community structure after deception
-
-        Returns
-        -------
-        List[int]
-            New community target after deception
-        """
-        for community in new_community_structure.communities:
-            if node_target in community:
-                return community
-        raise ValueError("Community not found")
-    
-    @staticmethod
-    def check_goal(
-            env,#: GraphEnvironment,
-            node_target: int,
-            old_community: int,
-            new_community: int) -> int:
-        """
-        Check if the goal of hiding the target node was achieved
-
-        Parameters
-        ----------
-        env : GraphEnvironment
-            Environment of the agent
-        node_target : int
-            Target node
-        old_community : int
-            Original community of the target node
-        new_community : int
-            New community of the target node
-        similarity_function : Callable
-            Similarity function to use
-            
-        Returns
-        -------
-        int
-            1 if the goal was achieved, 0 otherwise
-        """
-        if len(new_community) == 1:
-            return 1
-        # Copy the communities to avoid modifying the original ones
-        new_community_copy = new_community.copy()
-        new_community_copy.remove(node_target)
-        old_community_copy = old_community.copy()
-        old_community_copy.remove(node_target)
-        # Compute the similarity between the new and the old community
-        similarity = env.community_similarity(
-            new_community_copy,
-            old_community_copy
-        )
-        del new_community_copy, old_community_copy
-        if similarity <= env.tau:
-            return 1
-        return 0
-
-    @staticmethod
-    def initialize_dict(algs: List[str])->dict:
-        """
-        Initialize the dictionary for the evaluation
-
-        Parameters
-        ----------
-        algs : List[str]
-            List of algorithms names to evaluate
-        
-        Returns
-        -------
-        dict
-            Dictionary for the evaluation, where the keys are the algorithms
-            names and the values are dictionaries containing the metrics
-        """
-        log_dict = dict()
-        
-        for alg in algs:
-            log_dict[alg] = {
-                "goal": [],
-                "nmi": [],
-                "time": [],
-                "steps": [],
-            }
-        return log_dict
-    
     @staticmethod
     def save_test(
         log: dict, 

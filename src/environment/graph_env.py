@@ -1,7 +1,7 @@
 """Module for the GraphEnviroment class"""
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
 from src.utils.utils import HyperParams, SimilarityFunctionsNames, Utils
-from src.utils.similarity import CommunitySimilarity, GraphSimilarity
+from src.community_algs.metrics.similarity import CommunitySimilarity, GraphSimilarity
 from typing import List, Tuple, Callable
 
 from karateclub import Node2Vec

@@ -32,22 +32,15 @@ class ActorNetwork(nn.Module):
         # self.relu = nn.LeakyReLU()
         self.relu = nn.ReLU()
         # self.tanh = nn.Tanh()
+        
+        self.dropout = nn.Dropout(HyperParams.DROPOUT.value)
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
         out = F.relu(self.conv1(data.x, data.edge_index))
         # out = out + data.x
         x = F.relu(self.lin1(out))
+        x = self.dropout(x)
         x = F.relu(self.lin2(x))
+        x = self.dropout(x)
         x = self.lin3(x)
         return x
-    
-    """
-    # Using GraphEncoder
-    def forward(self, state: Data):
-        embedding, _ = self.graph_encoder(state)
-        embedding += state.x
-        actions = self.relu(self.lin1(embedding))
-        actions = self.relu(self.lin2(actions))
-        actions = self.lin3(actions)
-        return actions
-    """

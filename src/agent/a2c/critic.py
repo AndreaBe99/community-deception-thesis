@@ -28,26 +28,17 @@ class CriticNetwork(nn.Module):
         self.relu = nn.ReLU()
         # self.relu = F.relu
         # self.tanh = nn.Tanh()
+        
+        self.dropout = nn.Dropout(HyperParams.DROPOUT.value)
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
         out = F.relu(self.conv1(data.x, data.edge_index))
         # x = out + data.x
         # x = torch.sum(x, dim=0)
         x = torch.sum(out, dim=0)
-        # x = self.relu(self.lin1(data))
         x = self.relu(self.lin1(x))
+        x = self.dropout(x)
         x = self.relu(self.lin2(x))
+        x = self.dropout(x)
         x = self.lin3(x)
         return x
-
-    """
-    # Using GraphEncoder
-    def forward(self, state: Data):
-        embedding, _ = self.graph_encoder(state)
-        embedding += state.x
-        embedding = torch.sum(embedding, dim=0)
-        value = self.relu(self.lin1(embedding))
-        value = self.relu(self.lin2(value))
-        value = self.lin3(value)
-        return value
-    """

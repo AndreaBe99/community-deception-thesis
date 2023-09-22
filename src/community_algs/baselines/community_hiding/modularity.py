@@ -7,136 +7,218 @@ import random
 import timeit
 import math
 
-from cdlib import algorithms
+import networkx as nx
 
+import cdlib
+from typing import List
 
-class NODEC:
-    def __init__(self, graph):
-        self.graph = graph
-        self.induced_subgraph = None
-        self.target_com_node_degrees = None
-        self.node_count = None
-
-        # degree of each community (sum of the degrees of the nodes)
-        self.community_degrees = None
-
-        # Detection time
-        self.time_detection = None
-
-        # for each node i in comH, find its degree in its community
-        self.degi_Ci = None
-
-        # Number of internal edges for each community
-        self.E_Ci = None
-
-        self.target_community = None
-        self.initial_community_size = None
-        self.communities = None
-        self.communities_object = None
-        self.community_membership_dict = None
-        #
-        self.communities_after = None
-        self.communities_after_object = None
-        self.ratio_community_members = None
-
-    def getModularity(self, graph, communities):
-        return evaluation.newman_girvan_modularity(graph, communities).score
-
-    def initializeCommunityData(
-            self, 
-            detection_algo, 
-            worst_case_scenario=True,
-            community_target=None,
-            communities_object=None):
-        if community_target is None:
-            self.communities, self.time_detection = self.computeCommunitiesCDLIB(
-                detection_algo)
-            if worst_case_scenario:
-                self.target_community_id = self.getTargetCommunityID()
-                self.target_community = self.communities[self.target_community_id]
-                self.initial_community_size = len(self.target_community)
-            else:
-                self.target_community = self.getTargetCommunityNOWorstCase()
-                self.initial_community_size = len(self.target_community)
-                self.target_community_id = -1
-        else:
-            self.communities = communities_object.communities
-            self.communities_object = communities_object
-            self.target_community = community_target
-            self.initial_community_size = len(self.target_community)
-            self.target_community_id = self.getTargetCommunityID()
+class Modularity:
+    def __init__(
+        self, 
+        graph: nx.Graph, 
+        community_target: List[int],
+        communities_object: cdlib.NodeClustering,):
         
+        self.nx_graph = graph.copy()
+        self.graph = ig.Graph.from_networkx(self.nx_graph)
+        # Due to a bug in cdlib, we need to rename the nodes
+        self.graph.vs["name"] = self.graph.vs["name"]=range(0,len(self.graph.vs)) # self.graph.vs["_nx_name"]
+        del (self.graph.vs["_nx_name"])
+        # Add weight attribute to the edges equal to 1
+        self.graph.es["weight"] = 1
         
+        self.target_community = community_target
+        self.communities_object = copy.deepcopy(communities_object)
+        self.communities = communities_object.communities
+        
+        # set
+        self.initial_community_size = len(self.target_community)
         self.community_size = len(self.target_community)
         self.induced_subgraph = self.getInducedSubgraph()
         self.community_membership_dict = self.nodeCommunityDict()
         self.target_com_node_degrees = self.getTargetNodeDegrees()
+        # for each node i in comH, find its degree in its community
         self.degi_Ci = self.getTargetNodeDegreePerCommunity()
+        # Number of internal edges for each community
         self.E_Ci = self.communities_object.edges_inside(summary=False)
-
         self.community_degrees = self.getCommunityDegrees()
         self.node_count = self.graph.vcount()
 
-    def computeCommunitiesCDLIB(self, detection_algo):
-        g = self.graph
-        start = timeit.default_timer()
-        if detection_algo == "leiden":
-            coms = algorithms.leiden(g)
-        elif detection_algo == "louv":
-            coms = algorithms.louvain(g)
-        elif detection_algo == "infomap":
-            coms = algorithms.infomap(g)
-        elif detection_algo == "combo":
-            coms = algorithms.pycombo(g)
-        elif detection_algo == "eig":
-            coms = algorithms.eigenvector(g)
-        elif detection_algo == "walk":
-            coms = algorithms.walktrap(g)
-        elif detection_algo == "scd":
-            coms = algorithms.scd(g)
-        elif detection_algo == "kcut":
-            coms = algorithms.kcut(g)
-        elif detection_algo == "rspec":
-            coms = algorithms.r_spectral_clustering(
-                g, method="regularized", percentile=20)
-        elif detection_algo == "labelp":
-            coms = algorithms.label_propagation(g)
-        elif detection_algo == "greedy":
-            coms = algorithms.greedy_modularity(g)
-        end = timeit.default_timer()
-        self.communities = coms.communities
-        self.communities_object = coms
-        return coms.communities, (end - start)
+        # Detection time
+        self.time_detection = None
+        self.communities_after = None
+        self.communities_after_object = None
+        self.ratio_community_members = None
 
-    def computeCommunitiesAfterUpdateCDLIB(self, detection_algo, g):
-        start = timeit.default_timer()
-        if detection_algo == "leiden":
-            coms = algorithms.leiden(g)
-        elif detection_algo == "louv":
-            coms = algorithms.louvain(g)
-        elif detection_algo == "infomap":
-            coms = algorithms.infomap(g)
-        elif detection_algo == "combo":
-            coms = algorithms.pycombo(g)
-        elif detection_algo == "eig":
-            coms = algorithms.eigenvector(g)
-        elif detection_algo == "walk":
-            coms = algorithms.walktrap(g)
-        elif detection_algo == "scd":
-            coms = algorithms.scd(g)
-        elif detection_algo == "kcut":
-            coms = algorithms.kcut(g)
-        elif detection_algo == "rspec":
-            coms = algorithms.r_spectral_clustering(
-                g, method="regularized", percentile=20)
-        elif detection_algo == "labelp":
-            coms = algorithms.label_propagation(g)
-        elif detection_algo == "greedy":
-            coms = algorithms.greedy_modularity(g)
-        end = timeit.default_timer()
-        self.communities_after = coms.communities
-        self.communities_after_object = coms
-        return coms.communities, (end - start)
+        self.getDeceptionScore(after_updates=False)
+
+    ############################################################################
+    #                           COMMUNITY DECEPTION                            #
+    ############################################################################
+    def com_decept_nodec(self, budget):
+        beta = budget
+        while (True):
+            # this gives the best value the one giving hghest DELTA_del
+            delta_del, best_node_to_delete = self.computeDeltaNodeDeletion()
+            # this gives a single value as we are adding a new node
+            delta_add, deg_i_Cj, deg_i, Cj_index = self.computeDeltaNodeAddition()
+            # this gives a value for each community member
+            delta_move, move_details = self.computeDeltaNodeMoving()
+
+            deltas = [delta_add, delta_del, delta_move]
+            best_index = deltas.index(max(deltas))
+            # print(deltas)
+            # print(best_index)
+            if delta_move > 0:
+                self.performNodeMove(move_details)
+                # print("Move")
+            else:
+                if delta_del > delta_add:
+                    self.performNodeDeletion(best_node_to_delete)
+                    self.performNewNodeAddition(deg_i_Cj, deg_i, Cj_index)
+                    print("Add")
+                else:
+                    self.performNewNodeAddition(deg_i_Cj, deg_i, Cj_index)
+                    print("Del")
+            beta = beta - 1
+            # if the community contains all -1 then stop !
+            if (beta == 0) or self.target_community.count(-1) == self.initial_community_size-2:
+                break
+            # else:
+            #    break
+        steps = budget - beta
+
+        nx_graph = self.graph.to_networkx()
+        nx.set_edge_attributes(nx_graph, values=1, name='weight')
+        return nx_graph, steps
+
+    def performNodeDeletion(self, node_to_delete):
+        neighs = self.graph.neighborhood(
+            vertices=node_to_delete, order=1, mode="all", mindist=1)
+        for n in neighs:
+            self.nodec.graph.delete_edges([(node_to_delete, n)])
+
+        nodex_index_in_com = self.target_community.index(node_to_delete)
+
+        self.target_community[nodex_index_in_com] = -1
+
+        node_com = self.getNodeCommunity(node_to_delete)
+
+        copy_coms = self.communities
+
+        if node_to_delete < max(self.community_membership_dict.keys()):
+            if len(copy_coms[node_com]) > 1:  # this avoids to have zero-nodes communities
+                copy_coms[node_com].remove(node_to_delete)
+
+        self.communities = copy_coms
+        degree_in_com_copy = self.degi_Ci
+        node_gree_in_its_com = degree_in_com_copy[nodex_index_in_com, node_com]
+
+        degree_in_com_copy[nodex_index_in_com] = 0
+        self.degi_Ci = degree_in_com_copy
+        coms_degs_copy = self.community_degrees
+        coms_degs_copy[node_com] = coms_degs_copy[node_com] - \
+            node_gree_in_its_com
+        self.community_degrees = coms_degs_copy
+        internal_edges_copy = self.E_Ci
+        internal_edges_copy[node_com] = internal_edges_copy[node_com] - \
+            node_gree_in_its_com
+        self.E_Ci = internal_edges_copy
+
+    def performNewNodeAddition(self, degree_i_target_com, total_degree_i, target_com_index):
+        new_node_id = self.graph.vcount()
+        self.graph.add_vertices(1)
+        target_com = self.communities[target_com_index]
+        target_nodes_indexes = random.sample(
+            range(0, len(target_com)), degree_i_target_com)
+
+        for i in target_nodes_indexes:
+            self.graph.add_edges([(new_node_id, target_com[i])])
+        self.target_community.append(new_node_id)
+        copy_coms = self.communities
+        copy_coms[target_com_index].append(new_node_id)
+        self.communities = copy_coms
+        nodex_index_in_com = self.target_community.index(new_node_id)
+
+        degree_in_com_copy = self.degi_Ci
+        newrow = np.zeros(len(self.communities))
+        newrow[target_com_index] = degree_i_target_com
+        degree_in_com_copy = np.vstack([degree_in_com_copy, newrow])
+        self.degi_Ci = degree_in_com_copy
+
+        coms_degs_copy = self.community_degrees
+        coms_degs_copy[target_com_index] = coms_degs_copy[target_com_index] + \
+            degree_i_target_com
+        self.community_degrees = coms_degs_copy
+        internal_edges_copy = self.E_Ci
+        internal_edges_copy[target_com_index] = internal_edges_copy[target_com_index] + \
+            degree_i_target_com
+        self.E_Ci = internal_edges_copy
+        return self.graph
+
+    def performNodeMove(self, move_details):
+        node_to_move = int(move_details[0])  # node to move from Ci in Cj
+        new_community = int(move_details[2])  # Cj
+        old_community = self.getNodeCommunity(node_to_move)  # Ci
+        new_edges_new_com = move_details[3]  # total edges in Cj
+        edges_to_be_deleted = move_details[4]  # edges in in Ci
+        # nodes tha alredy has in Cj
+        node_deg_already_new_com = move_details[5]
+        nodex_index_in_com = self.target_community.index(node_to_move)
+
+        target_com = self.communities[new_community]
+        target_nodes_indexes = range(0, len(target_com))
+
+        # EDGE ADDITIONS in Cj
+        for i in target_nodes_indexes:
+            if not (self.graph.are_connected(node_to_move, target_com[i]) and self.graph.are_connected(target_com[i], node_to_move)):
+                self.graph.add_edges([(node_to_move, target_com[i])])
+
+        # EDGE DELETIONS in Ci
+        neighs = self.graph.neighborhood(
+            vertices=node_to_move, order=1, mode="all", mindist=1)
+        for n in neighs:
+            if old_community == self.getNodeCommunity(n):
+                if (self.graph.are_connected(node_to_move, n)):
+                    self.graph.delete_edges([(node_to_move, n)])
+                else:
+                    if (self.graph.are_connected(n, node_to_move)):
+                        self.graph.delete_edges([(n, node_to_move)])
+        degree_in_com_copy = self.degi_Ci
+        node_gree_in_its_com = degree_in_com_copy[nodex_index_in_com, old_community]
+
+        # its degree becomes 0 in Ci
+        degree_in_com_copy[nodex_index_in_com, old_community] = 0
+
+        # degree_in_com_copy[nodex_index_in_com, new_community]
+        degree_in_com_copy[
+            nodex_index_in_com,
+            new_community] = new_edges_new_com-node_deg_already_new_com
+
+        self.degi_Ci = degree_in_com_copy
+
+        coms_degs_copy = self.community_degrees
+        coms_degs_copy[old_community] = coms_degs_copy[old_community] - \
+            node_gree_in_its_com
+        coms_degs_copy[new_community] = coms_degs_copy[new_community] + \
+            (new_edges_new_com-node_deg_already_new_com)
+        self.community_degrees = coms_degs_copy
+
+        internal_edges_copy = self.E_Ci
+        internal_edges_copy[old_community] = internal_edges_copy[old_community] - \
+            node_gree_in_its_com
+        internal_edges_copy[new_community] = internal_edges_copy[new_community] + \
+            (new_edges_new_com-node_deg_already_new_com)
+        self.E_Ci = internal_edges_copy
+        return self.graph
+    
+    ############################################################################
+    #                          MODULARITY UTILITY                              #
+    ############################################################################
+    def getModularity(self, graph, communities):
+        nx_graph = graph.to_networkx()
+        nx.set_edge_attributes(nx_graph, values = 1, name = 'weight')
+        return evaluation.newman_girvan_modularity(nx_graph, communities).score
 
     def getCommunityDegrees(self):
         com_degs = []
@@ -182,13 +264,6 @@ class NODEC:
 
     def getInducedGraphNodeId(self, graph, nodeLabel):
         return graph.vs[nodeLabel]["name"]
-
-    def read_network(self, name):
-        self.dataset_name = name
-        self.graph = ig.read(self.local_path + name +
-                             ".edgelist", directed=False)
-        self.graph.vs["name"] = range(0, len(self.graph.vs))
-        return self.graph
 
     def find_nearest(self, array, value):
         array = np.asarray(array)

@@ -11,6 +11,7 @@ from torch.nn import functional as F
 
 import networkx as nx
 import numpy as np
+import random
 import torch
 import json
 import gc
@@ -28,7 +29,8 @@ class Agent:
             lambda_metrics: List[float] = HyperParams.LAMBDA.value,
             alpha_metrics: List[float] = HyperParams.ALPHA.value,
             eps: float = HyperParams.EPS_CLIP.value,
-            best_reward: float = HyperParams.BEST_REWARD.value):
+            best_reward: float = HyperParams.BEST_REWARD.value,
+            weight_decay: float = HyperParams.WEIGHT_DECAY.value):
         """
         Initialize the agent.
 
@@ -90,6 +92,7 @@ class Agent:
         # Environment hyperparameters
         self.lambda_metrics = lambda_metrics
         self.alpha_metrics = alpha_metrics
+        self.weight_decay = weight_decay
         # Hyperparameters to be set during grid search
         self.lr = None
         self.gamma = None
@@ -186,9 +189,9 @@ class Agent:
         actor_params = list(self.policy.actor.parameters())
         critic_params = list(self.policy.critic.parameters())
         self.optimizers['a_optimizer'] = torch.optim.Adam(
-            actor_params, lr=self.lr)
+            actor_params, lr=self.lr, weight_decay=self.weight_decay)
         self.optimizers['c_optimizer'] = torch.optim.Adam(
-            critic_params, lr=self.lr)
+            critic_params, lr=self.lr, weight_decay=self.weight_decay)
 
     ############################################################################
     #                            GRID SEARCH                                   #
@@ -230,6 +233,12 @@ class Agent:
         epochs = trange(episode)  # epoch iterator
         self.policy.train()  # set model in train mode
         for i_episode in epochs:
+            
+            # With probability epsilon=0.3, change the community target and the
+            # node target
+            if random.randint(0, 100) < HyperParams.EPSILON.value:
+                self.env.change_target_community()
+            
             # Print node_target and community_target
             # print("* Node target:", self.env.node_target)
             # print("* Community target:", self.env.community_target)
@@ -367,24 +376,68 @@ class Agent:
             returns = (returns - returns.mean()) / (returns.std() + self.eps)
         else:
             returns = torch.tensor(returns)
+            
+        # TEST: 1 Entropy
+        # entropy_loss = 0.0
+        
+        # TEST: 2 L1 regularization
+        # self.l1_reg_coef = 0.01
+        
+        # TEST: 3 SMIRL
+        # Compute surprise for each state
+        # state_values = torch.stack([sa.value for sa in saved_actions])
+        # avg_state_value = state_values.mean()
+        # surprise = torch.abs(state_values - avg_state_value)
+        # Add a regularization term to the actor and critic losses that penalizes high surprise states
+        # smirl_coeff = 0.1  # You can tune this hyperparameter
+        # for (log_prob, value), R, surprise in zip(saved_actions, returns, surprise):
+        
         # Computing losses
         for (log_prob, value), R in zip(saved_actions, returns):
             # Difference between true value and estimated value from critic
             advantage = R - value.item()
             # calculate actor (policy) loss
-            policy_losses.append(-log_prob * advantage)
+            policy_losses.append(-log_prob * advantage) # Old
             # calculate critic (value) loss using L1 smooth loss
             value_losses.append(F.smooth_l1_loss(
                 value, torch.tensor([R]).to(self.device)))
+            
+            # Test: 1 Entropy
+            # Calculate entropy
+            # entropy = -log_prob * torch.exp(log_prob)
+            # entropy_loss += entropy.mean()
+            
+            
+            # TEST: 2 L1 regularization
+            # policy_losses.append(
+            #     (-log_prob * advantage) + 
+            #     self.l1_reg_coef * torch.sum(
+            #         torch.abs(self.policy.parameters()))
+            # )
+            
+            # TEST: 3 SMIRL
+            # Calculate actor (policy) loss with SMIRL regularization
+            # policy_losses.append(-log_prob * advantage + smirl_coeff * surpr)
+            # Calculate critic (value) loss with SMIRL regularization
+            # value_losses.append(F.smooth_l1_loss(value, torch.tensor(
+            #   [R]).to(self.device)) + smirl_coeff * surpr)
+
         # take gradient steps
         self.optimizers['a_optimizer'].zero_grad()
-        a_loss = torch.stack(policy_losses).sum()
+        a_loss = torch.stack(policy_losses).sum()     # Old
+        
+        # Test: 1 Entropy
+        # self.entropy_coeff = 0.01
+        # a_loss = torch.stack(policy_losses).sum() - (self.entropy_coeff * entropy_loss)
+        
         a_loss.backward()
         self.optimizers['a_optimizer'].step()
+        
         self.optimizers['c_optimizer'].zero_grad()
         v_loss = torch.stack(value_losses).sum()
         v_loss.backward()
         self.optimizers['c_optimizer'].step()
+        
         # Compute mean losses
         mean_a_loss = torch.stack(policy_losses).mean().item()
         mean_v_loss = torch.stack(value_losses).mean().item()

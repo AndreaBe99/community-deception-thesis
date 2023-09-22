@@ -55,7 +55,7 @@ if __name__ == "__main__":
         # BETAs defines the number of actions to perform
         # Beta for the community hiding task defines the percentage of rewiring 
         # action, add or remove edges
-        community_betas = [10, 20, 30]
+        community_betas = [1, 3, 5]
         # Beta for the node hiding task is a multiplier of mean degree of the
         # the graph
         node_betas = [1, 2, 3]  # [1,3,5]
@@ -64,17 +64,20 @@ if __name__ == "__main__":
         node_hiding = NodeHiding(agent=agent, model_path=model_path)
         community_hiding = CommunityHiding(agent=agent, model_path=model_path)
         
+        print("* NOTE:")
+        print("*    - Beta for Node Hiding is a multiplier of the mean degree of the graph")
+        print("*    - Beta for Community Hiding is the percentage of rewiring action, add or remove edges")
         for tau in taus:
             
             print("* Node Hiding with tau = {}".format(tau))
             for beta in node_betas:
-                print("* * Beta = {}".format(beta))
+                print("* * Beta Node = {}".format(beta))
                 node_hiding.set_parameters(beta=beta, tau=tau)
                 node_hiding.run_experiment()
                 
             print("* Community Hiding with tau = {}".format(tau))
             for beta in community_betas:
-                print("* * Beta = {}".format(beta))
+                print("* * Beta Community = {}".format(beta))
                 community_hiding.set_parameters(beta=beta, tau=tau)
                 community_hiding.run_experiment()
             print("* "*50)

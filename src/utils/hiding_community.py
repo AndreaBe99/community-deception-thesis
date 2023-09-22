@@ -2,7 +2,9 @@ from typing import List, Callable, Tuple
 from src.utils.utils import HyperParams, Utils, FilePaths
 from src.environment.graph_env import GraphEnvironment
 from src.community_algs.metrics.deception_score import DeceptionScore
-from src.community_algs.baselines.safeness import Safeness
+# from src.community_algs.baselines.community_hiding.test_safeness import Safeness
+from src.community_algs.baselines.community_hiding.safeness import Safeness
+from src.community_algs.baselines.community_hiding.modularity import Modularity
 from src.agent.agent import Agent
 
 from tqdm import trange
@@ -52,7 +54,7 @@ class CommunityHiding():
         self.edge_budget = None
         self.max_steps = None
         
-        self.evaluation_algs = ["Agent", "Safeness"]
+        self.evaluation_algs = ["Agent", "Safeness", "Modularity"]
 
     def set_parameters(self, beta: int, tau: float) -> None:
         """Set the environment with the new parameters, for new experiments
@@ -115,14 +117,26 @@ class CommunityHiding():
         # Copy the community target to avoid modifying the original one
         self.community_target = copy.deepcopy(self.agent.env.community_target)
         # self.node_target = self.agent.env.node_target
-        
+
         # Initialize the Deception Score algorithm
         self.deception_score_obj = DeceptionScore(
             copy.deepcopy(self.community_target))
         # Initialize the Safeness algorithm
+        # self.safeness_obj = Safeness(
+        #     self.original_graph,
+        #     self.community_target,
+        # )
         self.safeness_obj = Safeness(
-            self.original_graph.copy(),
-            copy.deepcopy(self.community_target),
+            self.community_edge_budget,
+            self.original_graph,
+            self.community_target,
+            self.community_structure,
+        )
+        
+        self.modularity_obj = Modularity(
+            self.original_graph,
+            self.community_target,
+            self.community_structure,
         )
     
     def run_experiment(self)->None:
@@ -143,8 +157,14 @@ class CommunityHiding():
             # ° --------- Baselines --------- ° #
             # Safeness
             steps.set_description(
-                f"* * * Testing Episode {step+1} | Safeness")
+                f"* * * Testing Episode {step+1} | Safeness Rewiring")
             self.run_alg(self.run_safeness)
+            
+            # Modularity
+            steps.set_description(
+                f"* * * Testing Episode {step+1} | Modularity Rewiring")
+            self.run_alg(self.run_modularity)
+            
         Utils.check_dir(self.path_to_save)
         Utils.save_test(
             log=self.log_dict,
@@ -183,6 +203,9 @@ class CommunityHiding():
         """
         tot_steps = 0
         agent_goal_reached = False
+        # Initialize the new community structure as the original one, because
+        # the agent could not perform any rewiring
+        communities = self.community_structure
         for node in self.community_target:
             self.agent.env.node_target = node
             # The agent possible action are changed in the test function, which
@@ -197,14 +220,19 @@ class CommunityHiding():
             # print("Node {} - Steps: {}".format(node, agent.step))
             tot_steps += self.agent.step
             if tot_steps >= self.community_edge_budget:
+                if self.agent.env.new_community_structure is None:
+                    # The agent did not perform any rewiring, i.e. are the same communities
+                    agent_goal_reached = False
+                    break
                 if self.community_target not in self.agent.env.new_community_structure.communities:
                     agent_goal_reached = True
+                communities = self.agent.env.new_community_structure
                 break
         # Compute Deception Score between the new community structure and the
         # original one
         deception_score = self.deception_score_obj.get_deception_score(
-            self.agent.env.graph.copy(),
-            copy.deepcopy(self.agent.env.new_community_structure.communities),
+            new_graph.copy(),
+            copy.deepcopy(communities.communities),
         )
         # Compute NMI between the new community structure and the original one
         nmi = self.get_nmi(self.community_structure, self.agent.env.new_community_structure)
@@ -223,23 +251,51 @@ class CommunityHiding():
         Tuple[str, nx.Graph, int, float, int]
             Algorithm name, goal, nmi, deception score, steps
         """
-        new_graph, steps = self.safeness_obj.community_hiding(
-            community_target=self.community_target,
-            edge_budget=self.community_edge_budget,
-        )
+        # new_graph, steps = self.safeness_obj.community_hiding(
+        #    community_target=self.community_target,
+        #    edge_budget=self.community_edge_budget,
+        # )
+        new_graph, steps = self.safeness_obj.com_decept_safeness()
+        
         # Compute the new community structure
         new_communities = self.agent.env.detection.compute_community(new_graph)
         
         # Compute Deception Score between the new community structure and the
         # original one
         deception_score = self.deception_score_obj.get_deception_score(
-            self.original_graph.copy(),
+            new_graph.copy(),
             copy.deepcopy(new_communities.communities),
         )
         # Compute NMI between the new community structure and the original one
         nmi = self.get_nmi(self.community_structure, new_communities)
         goal = 1 if self.community_target not in new_communities.communities else 0
         return self.evaluation_algs[1], goal, nmi, deception_score, steps
+    
+    def run_modularity(self) -> Tuple[str, int, float, float, int]:
+        """
+        Evaluate the Safeness algorithm on the Node Hiding task
+
+        Returns
+        -------
+        Tuple[str, nx.Graph, int, float, int]
+            Algorithm name, goal, nmi, deception score, steps
+        """
+        new_graph, steps = self.modularity_obj.com_decept_nodec(
+            self.community_edge_budget)
+        # Compute the new community structure
+        new_communities = self.agent.env.detection.compute_community(new_graph)
+
+        # Compute Deception Score between the new community structure and the
+        # original one
+        deception_score = self.deception_score_obj.get_deception_score(
+            new_graph.copy(),
+            copy.deepcopy(new_communities.communities),
+        )
+        # print("Deception Score:", deception_score)
+        # Compute NMI between the new community structure and the original one
+        nmi = self.get_nmi(self.community_structure, new_communities)
+        goal = 1 if self.community_target not in new_communities.communities else 0
+        return self.evaluation_algs[2], goal, nmi, deception_score, steps
 
     ############################################################################
     #                               UTILS                                      #

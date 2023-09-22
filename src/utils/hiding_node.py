@@ -2,9 +2,9 @@ from src.utils.utils import HyperParams, Utils, FilePaths
 from src.environment.graph_env import GraphEnvironment
 from src.agent.agent import Agent
 
-from src.community_algs.baselines.random_hiding import RandomHiding
-from src.community_algs.baselines.degree_hiding import DegreeHiding
-from src.community_algs.baselines.roam_hiding import RoamHiding
+from src.community_algs.baselines.node_hiding.random_hiding import RandomHiding
+from src.community_algs.baselines.node_hiding.degree_hiding import DegreeHiding
+from src.community_algs.baselines.node_hiding.roam_hiding import RoamHiding
 
 from typing import List, Callable, Tuple
 from tqdm import trange
@@ -98,6 +98,21 @@ class NodeHiding():
         # Copy the community target to avoid modifying the original one
         self.community_target = copy.deepcopy(self.agent.env.community_target)
         self.node_target = self.agent.env.node_target
+        
+        # Baseline algorithms
+        self.random_hiding = RandomHiding(
+            env=self.agent.env,
+            steps=self.edge_budget,
+            target_community=self.community_target)
+        self.degree_hiding = DegreeHiding(
+            env=self.agent.env,
+            steps=self.edge_budget,
+            target_community=self.community_target)
+        self.roam_hiding = RoamHiding(
+            self.original_graph,
+            self.node_target,
+            self.edge_budget,
+            self.detection_alg)
     
     ############################################################################
     #                               EVALUATION                                 #
@@ -155,22 +170,30 @@ class NodeHiding():
             Algorithm to evaluate
         """
         start = time.time()
-        alg_name, new_graph, goal, nmi, step = function()
+        alg_name, new_communities, step = function()
         end = time.time() - start
+        
+        # Compute NMI
+        nmi = self.get_nmi(self.community_structure, new_communities)
+        
+        # Check if the goal was achieved
+        community_target = self.get_new_community(new_communities)
+        goal = self.check_goal(community_target)
+        
         # Save results in the log dictionary
         self.save_metrics(alg_name, goal, nmi, end, step)
         
     ############################################################################
     #                               AGENT                                      #
     ############################################################################
-    def run_agent(self) -> Tuple[str, nx.Graph, int, float, int]:
+    def run_agent(self) -> Tuple[str, cdlib.NodeClustering, int]:
         """
         Evaluate the agent on the Node Hiding task
 
         Returns
         -------
-        Tuple[str, nx.Graph, int, float, int]
-            Algorithm name, new graph, goal, nmi, steps
+        Tuple[str, cdlib.NodeClustering, int]:
+            Algorithm name, Set of new communities, steps
         """
         new_graph = self.agent.test(
             lr=self.lr,
@@ -179,82 +202,46 @@ class NodeHiding():
             alpha_metric=self.alpha_metric,
             model_path=self.model_path,
         )
-        # Compute NMI between the new community structure and the original one
-        nmi = self.get_nmi(self.community_structure, self.agent.env.new_community_structure)
-        # Check if the goal of hiding the target node was achieved
-        community_target = self.get_new_community(self.agent.env.new_community_structure)
-        goal = self.check_goal(community_target)
-        return self.evaluation_algs[0], new_graph, goal, nmi, self.agent.step
+        return self.evaluation_algs[0], self.agent.env.new_community_structure, self.agent.step
     
     ############################################################################
     #                               BASELINES                                  #
     ############################################################################
-    def run_random(self) -> Tuple[str, nx.Graph, int, float, int]:
+    def run_random(self) -> Tuple[str, cdlib.NodeClustering, int]:
         """
         Evaluate the Random Hiding algorithm on the Node Hiding task
 
         Returns
         -------
-        Tuple[str, nx.Graph, int, float, int]
-            Algorithm name, new graph, goal, nmi, steps
+        Tuple[str, cdlib.NodeClustering, int]:
+            Algorithm name, Set of new communities, steps
         """
-        random_hiding = RandomHiding(
-            env=self.agent.env,
-            steps=self.edge_budget,
-            target_community=self.community_target)
-        rh_graph, rh_communities = random_hiding.hide_target_node_from_community()
-        # Compute NMI between the new community structure and the original one
-        nmi = self.get_nmi(self.community_structure, rh_communities)
-        # Check if the goal of hiding the target node was achieved
-        rh_community_target = self.get_new_community(rh_communities)
-        goal = self.check_goal(rh_community_target)
-        steps = self.edge_budget - random_hiding.steps
-        return self.evaluation_algs[1], rh_graph, goal, nmi, steps
+        rh_graph, rh_communities, steps = self.random_hiding.hide_target_node_from_community()
+        return self.evaluation_algs[1], rh_communities, steps
     
-    def run_degree(self) -> Tuple[str, nx.Graph, int, float, int]:
+    def run_degree(self) -> Tuple[str, cdlib.NodeClustering, int]:
         """
         Evaluate the Degree Hiding algorithm on the Node Hiding task
 
         Returns
         -------
-        Tuple[str, nx.Graph, int, float, int]
-            Algorithm name, new graph, goal, nmi, steps
+        Tuple[str, cdlib.NodeClustering, int]:
+            Algorithm name, Set of new communities, steps
         """
-        degree_hiding = DegreeHiding(
-            env=self.agent.env,
-            steps=self.edge_budget,
-            target_community=self.community_target)
-        dh_graph, dh_communities = degree_hiding.hide_target_node_from_community()
-        # Compute NMI between the new community structure and the original one
-        nmi = self.get_nmi(self.community_structure, dh_communities)
-        # Check if the goal of hiding the target node was achieved
-        dh_community_target = self.get_new_community(dh_communities)
-        goal = self.check_goal(dh_community_target)
-        steps = self.edge_budget - degree_hiding.steps
-        return self.evaluation_algs[2], dh_graph, goal, nmi, steps
+        dh_graph, dh_communities, steps = self.degree_hiding.hide_target_node_from_community()
+        return self.evaluation_algs[2], dh_communities, steps
     
-    def run_roam(self) -> Tuple[str, nx.Graph, int, float, int]:
+    def run_roam(self) -> Tuple[str, cdlib.NodeClustering, int]:
         """
         Evaluate the Roam Hiding algorithm on the Node Hiding task
 
         Returns
         -------
-        Tuple[str, nx.Graph, int, float, int]
-            Algorithm name, new graph, goal, nmi, steps
+        Tuple[str, cdlib.NodeClustering, int]:
+            Algorithm name, Set of new communities, steps
         """
-        roam_hiding = RoamHiding(
-            self.original_graph.copy(),
-            self.node_target,
-            self.edge_budget,
-            self.detection_alg)
-        ro_graph, ro_communities = roam_hiding.roam_heuristic(self.edge_budget)
-        # Compute NMI between the new community structure and the original one
-        nmi = self.get_nmi(self.community_structure, ro_communities)
-        # Check if the goal of hiding the target node was achieved
-        ro_community_target = self.get_new_community(ro_communities)
-        goal = self.check_goal(ro_community_target)
-        steps = self.edge_budget
-        return self.evaluation_algs[3], ro_graph, goal, nmi, steps
+        ro_graph, ro_communities = self.roam_hiding.roam_heuristic(self.edge_budget)
+        return self.evaluation_algs[3], ro_communities, self.edge_budget
 
     
     ############################################################################

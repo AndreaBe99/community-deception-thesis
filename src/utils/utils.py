@@ -29,9 +29,10 @@ class FilePaths(Enum):
     # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/"
     
     # ! Trained model path for testing (change the following line to change the model)
-    TRAINED_MODEL = LOG_DIR + \
-        "kar/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
-
+    MODEL_PATH = "lfr_benchmark_node-200/tau-0.99_beta-30/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
+    # MODEL_PATH = "kar/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
+    TRAINED_MODEL = LOG_DIR + MODEL_PATH
+    
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'
     # KAR = DATASETS_DIR + '/kar.gml'
@@ -95,9 +96,9 @@ class SimilarityFunctionsNames(Enum):
 class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # ! REAL GRAPH Graph path (change the following line to change the graph)
-    GRAPH_NAME = FilePaths.KAR.value
+    GRAPH_NAME = FilePaths.WORDS.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    DETECTION_ALG_NAME = DetectionAlgorithmsNames.INF.value
+    DETECTION_ALG_NAME = DetectionAlgorithmsNames.WALK.value
     # Multiplier for the rewiring action number, i.e. (mean_degree * BETA)
     BETA = 3
     # ! Strength of the deception constraint, value between 0 (hard) and 1 (soft) 
@@ -117,9 +118,14 @@ class HyperParams(Enum):
     EMBEDDING_DIM = 128 # 256
 
     """ Agent Parameters"""
+    # Chaneg target community and target node with a probability of EPSILON
+    EPSILON = 25    # Between 0 and 100
     # Networl Architecture
     HIDDEN_SIZE_1 = 64
     HIDDEN_SIZE_2 = 64
+    # Rehularization parameters
+    DROPOUT = 0.2
+    WEIGHT_DECAY = 1e-3
     # Hyperparameters for the ActorCritic
     EPS_CLIP = np.finfo(np.float32).eps.item()  # 0.2
     BEST_REWARD = -np.inf
@@ -133,7 +139,7 @@ class HyperParams(Enum):
     
     """ Training Parameters """
     # Number of episodes to collect experience
-    MAX_EPISODES = 1000
+    MAX_EPISODES = 10000
     # Dictonary for logging
     LOG_DICT = {
         # List of rewards per episode
@@ -158,14 +164,10 @@ class HyperParams(Enum):
     """Evaluation Parameters"""
     # ! Change the following parameters according to the hyperparameters to test
     STEPS_EVAL = 100
-    LR_EVAL = LR[0]
-    GAMMA_EVAL = GAMMA[0]
-    LAMBDA_EVAL = LAMBDA[0]
-    ALPHA_EVAL = ALPHA[0]
-    # Algorithms to evaluate
-    ALGS_EVAL = ["Roam",  "Random", "Degree", "Agent"]
-    # Metrics for each algorithm
-    METRICS_EVAL = ["goal", "nmi", "time", "steps"]
+    LR_EVAL = 0.0001    # LR[0]
+    GAMMA_EVAL = 0.7    # GAMMA[0]
+    LAMBDA_EVAL = 0.1   # LAMBDA[0]
+    ALPHA_EVAL = 0.7    # ALPHA[0]
     
     """Graph Generation Parameters"""
     # ! Change the following parameters to modify the graph

@@ -555,9 +555,9 @@ class GraphEnvironment(object):
         print("* Number of communities found:",
               len(self.original_community_structure.communities))
         # print("* Rewiring Budget:", self.edge_budget, "=", self.beta, "*", self.graph.number_of_edges(), "/ 100",)
-        print("* Rewiring Budget: (n_edges/n_nodes)*BETA =",
+        print("* BETA - Rewiring Budget: (n_edges/n_nodes)*BETA =",
               self.graph.number_of_edges(), "/",
               self.graph.number_of_nodes(), "*", self.beta, "=",
               int(self.graph.number_of_edges() / self.graph.number_of_nodes())*self.beta)
-        print("* Weight of the Deception Constraint:", self.tau)
+        print("* TAU - Weight of the Deception Constraint:", self.tau)
         print("*", "-"*58, "\n")

@@ -30,6 +30,7 @@ class CommunityHiding():
             gamma: float = HyperParams.GAMMA_EVAL.value,
             lambda_metric: float = HyperParams.LAMBDA_EVAL.value,
             alpha_metric: float = HyperParams.ALPHA_EVAL.value,
+            epsilon_prob: float = HyperParams.EPSILON_EVAL.value,
             eval_steps: int = HyperParams.STEPS_EVAL.value,) -> None:
         self.agent = agent
         self.original_graph = agent.env.original_graph.copy()
@@ -47,6 +48,7 @@ class CommunityHiding():
         self.gamma = gamma
         self.lambda_metric = lambda_metric
         self.alpha_metric = alpha_metric
+        self.epsilon_prob = epsilon_prob
         self.eval_steps = eval_steps
 
         self.beta = None
@@ -55,6 +57,14 @@ class CommunityHiding():
         self.max_steps = None
         
         self.evaluation_algs = ["Agent", "Safeness", "Modularity"]
+        
+        # Use a list to store the beta values already computed, beacuse the
+        # Community Deception algorithms are not influenced by the value of
+        # tau, so we can compute the beta values only once
+        self.beta_values_computed = []
+        # Use a dict to store the results of the Community Deception algorithms
+        # for each beta value
+        self.beta_values_results = dict()
 
     def set_parameters(self, beta: int, tau: float) -> None:
         """Set the environment with the new parameters, for new experiments
@@ -68,6 +78,10 @@ class CommunityHiding():
         """
         self.beta = beta
         self.tau = tau
+        
+        # Set community beta value as key of the dictionary
+        if self.beta not in self.beta_values_results:
+            self.beta_values_results[self.beta] = dict()
 
         self.agent.env.tau = tau
         # ! NOTE: It isn't the same beta as the one used in the Node Hiding task
@@ -104,6 +118,7 @@ class CommunityHiding():
             f"tau_{self.tau}/" + \
             f"community_hiding/" + \
             f"beta_{self.beta}/" + \
+            f"eps_{self.epsilon_prob}/" + \
             f"lr_{self.lr}/gamma_{self.gamma}/" + \
             f"lambda_{self.lambda_metric}/alpha_{self.alpha_metric}/"
 
@@ -143,7 +158,6 @@ class CommunityHiding():
         # Start evaluation
         steps = trange(self.eval_steps, desc="Testing Episode")
         for step in steps:
-
             # Change the target community and node at each episode
             self.reset_experiment()
             # print("* Node Target:", self.node_target)
@@ -155,6 +169,10 @@ class CommunityHiding():
             self.run_alg(self.run_agent)
             
             # ° --------- Baselines --------- ° #
+            # Check if the beta value is already computed, if yes, skip
+            if self.beta in self.beta_values_computed:
+                continue
+            
             # Safeness
             steps.set_description(
                 f"* * * Testing Episode {step+1} | Safeness Rewiring")
@@ -164,7 +182,26 @@ class CommunityHiding():
             steps.set_description(
                 f"* * * Testing Episode {step+1} | Modularity Rewiring")
             self.run_alg(self.run_modularity)
-            
+        
+        # If the beta value is already computed, copy the results in the log
+        # dictionary, otherwise save the results in the backup dictionary
+        # for future iterations
+        if self.beta not in self.beta_values_computed:
+            self.beta_values_computed.append(self.beta)
+            self.beta_values_results[self.beta][
+                self.evaluation_algs[1]] = self.log_dict[self.evaluation_algs[1]]
+            self.beta_values_results[self.beta][
+                self.evaluation_algs[2]] = self.log_dict[self.evaluation_algs[2]]
+        else:    
+            # Cycle for each algorithm (except the agent) and for each metric
+            # and save the results in the log dictionary
+            for alg in self.evaluation_algs:
+                if alg != self.evaluation_algs[0]:
+                    for metric in self.beta_values_results[self.beta][alg]:
+                        self.log_dict[alg][metric] += self.beta_values_results[
+                            self.beta][alg][metric]
+
+                
         Utils.check_dir(self.path_to_save)
         Utils.save_test(
             log=self.log_dict,
@@ -215,6 +252,7 @@ class CommunityHiding():
                 gamma=self.gamma,
                 lambda_metric=self.lambda_metric,
                 alpha_metric=self.alpha_metric,
+                epsilon_prob=self.epsilon_prob,
                 model_path=self.model_path,
             )
             # print("Node {} - Steps: {}".format(node, agent.step))
@@ -354,6 +392,7 @@ class CommunityHiding():
         self.log_dict["Agent"]["gamma"] = self.gamma
         self.log_dict["Agent"]["lambda_metric"] = self.lambda_metric
         self.log_dict["Agent"]["alpha_metric"] = self.alpha_metric
+        self.log_dict["Agent"]["epsilon_prob"] = self.epsilon_prob
 
     def save_metrics(
             self,

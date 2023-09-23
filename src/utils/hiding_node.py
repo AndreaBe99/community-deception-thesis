@@ -30,6 +30,7 @@ class NodeHiding():
             gamma: float = HyperParams.GAMMA_EVAL.value,
             lambda_metric: float = HyperParams.LAMBDA_EVAL.value,
             alpha_metric: float = HyperParams.ALPHA_EVAL.value,
+            epsilon_prob: float = HyperParams.EPSILON_EVAL.value,
             eval_steps: int = HyperParams.STEPS_EVAL.value,) -> None:
         self.agent = agent
         self.original_graph = agent.env.original_graph.copy()
@@ -46,6 +47,7 @@ class NodeHiding():
         self.gamma = gamma
         self.lambda_metric = lambda_metric
         self.alpha_metric = alpha_metric
+        self.epsilon_prob = epsilon_prob
         self.eval_steps = eval_steps
         
         self.beta = None
@@ -84,6 +86,7 @@ class NodeHiding():
             f"tau_{self.tau}/" + \
             f"node_hiding/" + \
             f"beta_{self.beta}/" + \
+            f"eps_{self.epsilon_prob}/" + \
             f"lr_{self.lr}/gamma_{self.gamma}/" + \
             f"lambda_{self.lambda_metric}/alpha_{self.alpha_metric}/"
             
@@ -200,6 +203,7 @@ class NodeHiding():
             gamma=self.gamma,
             lambda_metric=self.lambda_metric,
             alpha_metric=self.alpha_metric,
+            epsilon_prob=self.epsilon_prob,
             model_path=self.model_path,
         )
         return self.evaluation_algs[0], self.agent.env.new_community_structure, self.agent.step
@@ -360,6 +364,7 @@ class NodeHiding():
         self.log_dict["Agent"]["gamma"] = self.gamma
         self.log_dict["Agent"]["lambda_metric"] = self.lambda_metric
         self.log_dict["Agent"]["alpha_metric"] = self.alpha_metric
+        self.log_dict["Agent"]["epsilon_prob"] = self.epsilon_prob
 
     def save_metrics(
             self,

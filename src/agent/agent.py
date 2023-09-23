@@ -9,6 +9,7 @@ from typing import List, Tuple
 from torch_geometric.data import Data
 from torch.nn import functional as F
 
+from itertools import product
 import networkx as nx
 import numpy as np
 import random
@@ -28,9 +29,11 @@ class Agent:
             gamma: List[float] = HyperParams.GAMMA.value,
             lambda_metrics: List[float] = HyperParams.LAMBDA.value,
             alpha_metrics: List[float] = HyperParams.ALPHA.value,
+            epsilon_probs: float = HyperParams.EPSILON.value,
+            weight_decay: float = HyperParams.WEIGHT_DECAY.value,
+            dropout: float = HyperParams.DROPOUT.value,
             eps: float = HyperParams.EPS_CLIP.value,
-            best_reward: float = HyperParams.BEST_REWARD.value,
-            weight_decay: float = HyperParams.WEIGHT_DECAY.value):
+            best_reward: float = HyperParams.BEST_REWARD.value)-> None:
         """
         Initialize the agent.
 
@@ -70,12 +73,13 @@ class Agent:
         self.hidden_size_1 = hidden_size_1
         self.hidden_size_2 = hidden_size_2
         self.action_dim = self.env.graph.number_of_nodes()
+        self.dropout = dropout
         self.policy = ActorCritic(
             state_dim=self.state_dim,
             hidden_size_1=self.hidden_size_1,
             hidden_size_2=self.hidden_size_2,
             action_dim=self.action_dim,
-            graph=self.env.graph
+            dropout=self.dropout,
         )
         # Set device
         self.device = torch.device(
@@ -89,6 +93,7 @@ class Agent:
         self.gamma_list = gamma
         self.eps = eps
         self.best_reward = best_reward
+        self.epsilon_probs = epsilon_probs
         # Environment hyperparameters
         self.lambda_metrics = lambda_metrics
         self.alpha_metrics = alpha_metrics
@@ -97,7 +102,8 @@ class Agent:
         self.lr = None
         self.gamma = None
         self.alpha_metric = None
-        self. optimizers = dict()
+        self.epsilon_prob = None
+        self.optimizers = dict()
 
         # ° ----- Training ----- ° #
         # State, nx.Graph
@@ -134,6 +140,7 @@ class Agent:
             gamma: float,
             lambda_metric: float,
             alpha_metric: float,
+            epsilon_prob: float,
             test: bool = False) -> None:
         """
         Reset hyperparameters
@@ -148,12 +155,17 @@ class Agent:
             Lambda parameter used to balance the reward and the penalty
         alpha_metric : float
             Alpha parameter used to balance the two penalties
+        epsilon_prob : float
+            Probability of changing the target node and the target community
         test : bool, optional
             Print hyperparameters during training, by default False
         """
         # Set A2C hyperparameters
         self.lr = lr
         self.gamma = gamma
+        if epsilon_prob < 0 or epsilon_prob > 100:
+            raise ValueError("Epsilon must be between 0 and 100")
+        self.epsilon_prob = epsilon_prob
         # Set environment hyperparameters
         self.env.lambda_metric = lambda_metric
         self.env.alpha_metric = alpha_metric
@@ -198,13 +210,16 @@ class Agent:
     ############################################################################
     def grid_search(self) -> None:
         """Perform grid search on the hyperparameters"""
-        for lr in self.lr_list:
-            for gamma in self.gamma_list:
-                for lambda_metric in self.lambda_metrics:
-                    for alpha_metric in self.alpha_metrics:
+        # Iterate over all the possible combinations of hyperparameters
+        for lr, gamma, lambda_metric, alpha_metric, epsilon_prob in product(
+                self.lr_list, 
+                self.gamma_list, 
+                self.lambda_metrics,
+                self.alpha_metrics, 
+                self.epsilon_probs):
                         # Change Hyperparameters
                         self.reset_hyperparams(
-                            lr, gamma, lambda_metric, alpha_metric)
+                            lr, gamma, lambda_metric, alpha_metric, epsilon_prob)
                         # Configure optimizers with the current learning rate
                         self.configure_optimizers()
                         # Training
@@ -236,7 +251,7 @@ class Agent:
             
             # With probability epsilon=0.3, change the community target and the
             # node target
-            if random.randint(0, 100) < HyperParams.EPSILON.value:
+            if random.randint(0, 100) < self.epsilon_prob:
                 self.env.change_target_community()
             
             # Print node_target and community_target
@@ -455,11 +470,12 @@ class Agent:
             gamma: float,
             lambda_metric: float,
             alpha_metric: float,
+            epsilon_prob: float,
             model_path: str,
             graph_reset=True) -> nx.Graph:
         """Hide a given node from a given community"""
         # Set hyperparameters to select the correct folder
-        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric, True)
+        self.reset_hyperparams(lr, gamma, lambda_metric, alpha_metric, epsilon_prob, True)
         # Load best performing model
         self.load_checkpoint(path=model_path)
         # Set model in evaluation mode
@@ -487,6 +503,7 @@ class Agent:
         """
         file_path = FilePaths.LOG_DIR.value + \
             f"{self.env.env_name}/{self.env.detection_alg}/" +\
+            f"eps-{self.epsilon_prob}/" +\
             f"lr-{self.lr}/gamma-{self.gamma}/" +\
             f"lambda-{self.env.lambda_metric}/alpha-{self.env.alpha_metric}"
         return file_path
@@ -553,24 +570,27 @@ class Agent:
     def print_agent_info(self):
         # Print model architecture
         print("*", "-"*18, " Model Architecture ", "-"*18)
-        # print("* Embedding dimension: ", self.state_dim)
-        print("* Features vector size: ", self.state_dim)
-        print("* A2C Hidden layer 1 size: ", self.hidden_size_1)
-        print("* A2C Hidden layer 2 size: ", self.hidden_size_2)
-        print("* Actor Action dimension: ", self.action_dim)
+        print("* Dropout:                   ", self.dropout)
+        print("* Weight Decay:              ", self.weight_decay)
+        print("* Features vector size:      ", self.state_dim)
+        print("* A2C Hidden layer 1 size:   ", self.hidden_size_1)
+        print("* A2C Hidden layer 2 size:   ", self.hidden_size_2)
+        print("* Actor Action dimension:    ", self.action_dim)
         print("*", "-"*58, "\n")
         # Print Hyperparameters List
         print("*", "-"*18, "Hyperparameters List", "-"*18)
-        print("* Learning rate list: ", self.lr_list)
-        print("* Gamma parameter list: ", self.gamma_list)
-        print("* Lambda Metric list: ", self.lambda_metrics)
-        print("* Alpha Metric list: ", self.alpha_metrics)
+        print("* LR       - Learning Rate:      ", self.lr_list)
+        print("* Episilon - Probability:        ", self.epsilon_probs)
+        print("* Gamma    - Discount Factor:    ", self.gamma_list)
+        print("* Lambda   - Penalty Multiplier: ", self.lambda_metrics)
+        print("* Alpha    - Similarity Balancer:", self.alpha_metrics)
         print("*", "-"*58, "\n")
 
     def print_hyperparams(self):
         print("*", "-"*18, "Model Hyperparameters", "-"*18)
-        print("* Learning rate: ", self.lr)
-        print("* Gamma parameter: ", self.gamma)
-        print("* Lambda Metric: ", self.env.lambda_metric)
-        print("* Alpha Metric: ", self.env.alpha_metric)
-        print("* Value for clipping the loss function: ", self.eps)
+        print("* LR       - Learning Rate:      ", self.lr)
+        print("* Episilon - Probability:        ", self.epsilon_prob)
+        print("* Gamma    - Discount Factor:    ", self.gamma)
+        print("* Lambda   - Penalty Multiplier: ", self.env.lambda_metric)
+        print("* Alpha    - Similarity Balancer:", self.env.alpha_metric)
+        # print("* Value for clipping the loss function: ", self.eps)

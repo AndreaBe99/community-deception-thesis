@@ -29,8 +29,9 @@ class FilePaths(Enum):
     # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/"
     
     # ! Trained model path for testing (change the following line to change the model)
-    MODEL_PATH = "lfr_benchmark_node-200/tau-0.99_beta-30/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
+    # MODEL_PATH = "lfr_benchmark_node-200/tau-0.99_beta-30/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
     # MODEL_PATH = "kar/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
+    MODEL_PATH = "words/walktrap/eps-25/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/model.pth"
     TRAINED_MODEL = LOG_DIR + MODEL_PATH
     
     # Dataset file paths
@@ -96,9 +97,9 @@ class SimilarityFunctionsNames(Enum):
 class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # ! REAL GRAPH Graph path (change the following line to change the graph)
-    GRAPH_NAME = FilePaths.WORDS.value
+    GRAPH_NAME = FilePaths.MAD.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
-    DETECTION_ALG_NAME = DetectionAlgorithmsNames.WALK.value
+    DETECTION_ALG_NAME = DetectionAlgorithmsNames.GRE.value
     # Multiplier for the rewiring action number, i.e. (mean_degree * BETA)
     BETA = 3
     # ! Strength of the deception constraint, value between 0 (hard) and 1 (soft) 
@@ -119,7 +120,7 @@ class HyperParams(Enum):
 
     """ Agent Parameters"""
     # Chaneg target community and target node with a probability of EPSILON
-    EPSILON = 25    # Between 0 and 100
+    EPSILON = [25]    # Between 0 and 100
     # Networl Architecture
     HIDDEN_SIZE_1 = 64
     HIDDEN_SIZE_2 = 64
@@ -135,7 +136,7 @@ class HyperParams(Enum):
     # ! Discount factor:
     # - 0: only the reward on the next step is important
     # - 1: a reward in the future is as important as a reward on the next step
-    GAMMA = [0.7] # [0.9, 0.95]
+    GAMMA = [0.9] # [0.9, 0.95]
     
     """ Training Parameters """
     # Number of episodes to collect experience
@@ -168,6 +169,7 @@ class HyperParams(Enum):
     GAMMA_EVAL = 0.7    # GAMMA[0]
     LAMBDA_EVAL = 0.1   # LAMBDA[0]
     ALPHA_EVAL = 0.7    # ALPHA[0]
+    EPSILON_EVAL = 25   # EPSILON[0]
     
     """Graph Generation Parameters"""
     # ! Change the following parameters to modify the graph

@@ -96,7 +96,7 @@ class Modularity:
         neighs = self.graph.neighborhood(
             vertices=node_to_delete, order=1, mode="all", mindist=1)
         for n in neighs:
-            self.nodec.graph.delete_edges([(node_to_delete, n)])
+            self.graph.delete_edges([(node_to_delete, n)])
 
         nodex_index_in_com = self.target_community.index(node_to_delete)
 

@@ -26,18 +26,20 @@ class ActorCritic(nn.Module):
         hidden_size_1: int, 
         hidden_size_2: int, 
         action_dim: int,
-        graph: nx.Graph):
+        dropout: float):
         super(ActorCritic, self).__init__()
         self.actor = ActorNetwork(
             state_dim=state_dim,
             hidden_size_1=hidden_size_1,
             hidden_size_2=hidden_size_2,
-            action_dim=action_dim
+            action_dim=action_dim,
+            dropout=dropout,
         )
         self.critic = CriticNetwork(
             state_dim=state_dim,
             hidden_size_1=hidden_size_1,
-            hidden_size_2=hidden_size_2
+            hidden_size_2=hidden_size_2,
+            dropout=dropout,
         )
         self.device = torch.device(
             'cuda:0' if torch.cuda.is_available() else 'cpu')

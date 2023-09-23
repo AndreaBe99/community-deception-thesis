@@ -18,7 +18,8 @@ class ActorNetwork(nn.Module):
             state_dim: int,
             hidden_size_1: int,
             hidden_size_2: int,
-            action_dim: int):
+            action_dim: int,
+            dropout: float):
         super(ActorNetwork, self).__init__()
 
         # self.graph_encoder = GraphEncoder(state_dim)
@@ -33,9 +34,9 @@ class ActorNetwork(nn.Module):
         self.relu = nn.ReLU()
         # self.tanh = nn.Tanh()
         
-        self.dropout = nn.Dropout(HyperParams.DROPOUT.value)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, data: torch.Tensor) -> torch.Tensor:
+    def forward(self, data: Data) -> torch.Tensor:
         out = F.relu(self.conv1(data.x, data.edge_index))
         # out = out + data.x
         x = F.relu(self.lin1(out))

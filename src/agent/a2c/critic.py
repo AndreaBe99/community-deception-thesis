@@ -14,7 +14,8 @@ class CriticNetwork(nn.Module):
             self,
             state_dim: int,
             hidden_size_1: int,
-            hidden_size_2: int):
+            hidden_size_2: int,
+            dropout: float):
         super(CriticNetwork, self).__init__()
 
         # self.graph_encoder = GraphEncoder(state_dim)
@@ -29,9 +30,9 @@ class CriticNetwork(nn.Module):
         # self.relu = F.relu
         # self.tanh = nn.Tanh()
         
-        self.dropout = nn.Dropout(HyperParams.DROPOUT.value)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, data: torch.Tensor) -> torch.Tensor:
+    def forward(self, data: Data) -> torch.Tensor:
         out = F.relu(self.conv1(data.x, data.edge_index))
         # x = out + data.x
         # x = torch.sum(x, dim=0)

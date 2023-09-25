@@ -19,9 +19,13 @@ class CriticNetwork(nn.Module):
         super(CriticNetwork, self).__init__()
 
         # self.graph_encoder = GraphEncoder(state_dim)
-        self.conv1 = GCNConv(state_dim, hidden_size_1)
+        
+        # self.conv1 = GCNConv(state_dim, hidden_size_1)
+        self.conv1 = GCNConv(state_dim, state_dim)
 
-        self.lin1 = nn.Linear(hidden_size_1, hidden_size_1)
+        # self.lin1 = nn.Linear(hidden_size_1, hidden_size_1)
+        self.lin1 = nn.Linear(state_dim, hidden_size_1)
+        
         self.lin2 = nn.Linear(hidden_size_1, hidden_size_2)
         self.lin3 = nn.Linear(hidden_size_2, 1)
 
@@ -34,9 +38,8 @@ class CriticNetwork(nn.Module):
 
     def forward(self, data: Data) -> torch.Tensor:
         out = F.relu(self.conv1(data.x, data.edge_index))
-        # x = out + data.x
-        # x = torch.sum(x, dim=0)
-        x = torch.sum(out, dim=0)
+        x = out + data.x
+        x = torch.sum(x, dim=0)
         x = self.relu(self.lin1(x))
         x = self.dropout(x)
         x = self.relu(self.lin2(x))

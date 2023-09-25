@@ -23,9 +23,13 @@ class ActorNetwork(nn.Module):
         super(ActorNetwork, self).__init__()
 
         # self.graph_encoder = GraphEncoder(state_dim)
-        self.conv1 = GCNConv(state_dim, hidden_size_1)
+        
+        # self.conv1 = GCNConv(state_dim, hidden_size_1)
+        self.conv1 = GCNConv(state_dim, state_dim)
 
-        self.lin1 = nn.Linear(hidden_size_1, hidden_size_1)
+        # self.lin1 = nn.Linear(hidden_size_1, hidden_size_1)
+        self.lin1 = nn.Linear(state_dim, hidden_size_1)
+        
         self.lin2 = nn.Linear(hidden_size_1, hidden_size_2)
         # self.lin3 = nn.Linear(hidden_size_2, action_dim)
         self.lin3 = nn.Linear(hidden_size_2, 1)
@@ -38,8 +42,8 @@ class ActorNetwork(nn.Module):
 
     def forward(self, data: Data) -> torch.Tensor:
         out = F.relu(self.conv1(data.x, data.edge_index))
-        # out = out + data.x
-        x = F.relu(self.lin1(out))
+        x = out + data.x
+        x = F.relu(self.lin1(x))
         x = self.dropout(x)
         x = F.relu(self.lin2(x))
         x = self.dropout(x)

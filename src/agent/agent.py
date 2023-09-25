@@ -110,6 +110,8 @@ class Agent:
         self.obs = None
         # Cumulative reward of the episode
         self.episode_reward = 0
+        self.episode_entropy = 0
+        self.entropy_coeff = 0.02
         # Boolean variable to check if the episode is ended
         self.done = False
         # Boolean variable to check if the goal is reached
@@ -183,11 +185,24 @@ class Agent:
         # Clear state
         self.obs = None
         self.episode_reward = 0
+        self.episode_entropy = 0
         self.best_reward = HyperParams.BEST_REWARD.value
         self.done = False
         self.goal = False
         self.step = 0
         self.optimizers = dict()
+        
+        # Reset the weights of the policy network
+        del self.policy
+        self.policy = ActorCritic(
+            state_dim=self.state_dim,
+            hidden_size_1=self.hidden_size_1,
+            hidden_size_2=self.hidden_size_2,
+            action_dim=self.action_dim,
+            dropout=self.dropout,
+        )
+        # Set device
+        self.policy.to(self.device)
 
     def configure_optimizers(self) -> None:
         """
@@ -247,12 +262,17 @@ class Agent:
         episode = self.log_dict['train_episodes']
         epochs = trange(episode)  # epoch iterator
         self.policy.train()  # set model in train mode
+        mean_avg_reward = 0
+        mean_avg_reward_steps = 0
         for i_episode in epochs:
             
             # With probability epsilon=0.3, change the community target and the
             # node target
             if random.randint(0, 100) < self.epsilon_prob:
-                self.env.change_target_community()
+                if mean_avg_reward > 0 or mean_avg_reward_steps > episode/100:
+                    self.env.change_target_community()
+                    mean_avg_reward = 0
+                    mean_avg_reward_steps = 0
             
             # Print node_target and community_target
             # print("* Node target:", self.env.node_target)
@@ -260,6 +280,7 @@ class Agent:
             # Reset environment, original graph, and new set of possible actions
             self.obs = self.env.reset()
             self.episode_reward = 0
+            self.episode_entropy = 0
             self.done = False
             self.goal = False
             self.episode_rewards = []
@@ -301,6 +322,8 @@ class Agent:
                 f"| Steps: {self.step} " +
                 f"| Actor Loss: {self.a_loss:.2f} " +
                 f"| Critic Loss: {self.v_loss:.2f}")
+            mean_avg_reward += self.episode_reward/self.step
+            mean_avg_reward_steps += 1
             del rewards
         return self.log_dict
 
@@ -314,7 +337,7 @@ class Agent:
             If True, print rewiring action, by default False
         """
         # Select action: return a list of the probabilities of each action
-        action_rl = self.select_action(self.obs)
+        action_rl, entropy = self.select_action(self.obs)
         torch.cuda.empty_cache()
         # Save rewiring action if we are testing
         if test:
@@ -330,6 +353,7 @@ class Agent:
         self.obs, reward, self.done, self.goal = self.env.step(action_rl)
 
         # Update ra_losseward
+        self.episode_entropy += entropy
         self.episode_reward += reward
         # Store the transition in memory, used for the training step
         self.rewards.append(reward)
@@ -355,10 +379,11 @@ class Agent:
         """
         concentration, value = self.policy(state)
         dist = torch.distributions.Categorical(concentration)
+        entropy = dist.entropy().mean()
         action = dist.sample()
         self.saved_actions.append(
             self.SavedAction(dist.log_prob(action), value))
-        return int(action.item())
+        return int(action.item()), entropy
 
     def training_step(self) -> Tuple[float, float]:
         """
@@ -391,21 +416,6 @@ class Agent:
             returns = (returns - returns.mean()) / (returns.std() + self.eps)
         else:
             returns = torch.tensor(returns)
-            
-        # TEST: 1 Entropy
-        # entropy_loss = 0.0
-        
-        # TEST: 2 L1 regularization
-        # self.l1_reg_coef = 0.01
-        
-        # TEST: 3 SMIRL
-        # Compute surprise for each state
-        # state_values = torch.stack([sa.value for sa in saved_actions])
-        # avg_state_value = state_values.mean()
-        # surprise = torch.abs(state_values - avg_state_value)
-        # Add a regularization term to the actor and critic losses that penalizes high surprise states
-        # smirl_coeff = 0.1  # You can tune this hyperparameter
-        # for (log_prob, value), R, surprise in zip(saved_actions, returns, surprise):
         
         # Computing losses
         for (log_prob, value), R in zip(saved_actions, returns):
@@ -416,35 +426,10 @@ class Agent:
             # calculate critic (value) loss using L1 smooth loss
             value_losses.append(F.smooth_l1_loss(
                 value, torch.tensor([R]).to(self.device)))
-            
-            # Test: 1 Entropy
-            # Calculate entropy
-            # entropy = -log_prob * torch.exp(log_prob)
-            # entropy_loss += entropy.mean()
-            
-            
-            # TEST: 2 L1 regularization
-            # policy_losses.append(
-            #     (-log_prob * advantage) + 
-            #     self.l1_reg_coef * torch.sum(
-            #         torch.abs(self.policy.parameters()))
-            # )
-            
-            # TEST: 3 SMIRL
-            # Calculate actor (policy) loss with SMIRL regularization
-            # policy_losses.append(-log_prob * advantage + smirl_coeff * surpr)
-            # Calculate critic (value) loss with SMIRL regularization
-            # value_losses.append(F.smooth_l1_loss(value, torch.tensor(
-            #   [R]).to(self.device)) + smirl_coeff * surpr)
 
         # take gradient steps
         self.optimizers['a_optimizer'].zero_grad()
-        a_loss = torch.stack(policy_losses).sum()     # Old
-        
-        # Test: 1 Entropy
-        # self.entropy_coeff = 0.01
-        # a_loss = torch.stack(policy_losses).sum() - (self.entropy_coeff * entropy_loss)
-        
+        a_loss = torch.stack(policy_losses).sum() 
         a_loss.backward()
         self.optimizers['a_optimizer'].step()
         

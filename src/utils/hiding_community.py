@@ -5,6 +5,11 @@ from src.community_algs.metrics.deception_score import DeceptionScore
 # from src.community_algs.baselines.community_hiding.test_safeness import Safeness
 from src.community_algs.baselines.community_hiding.safeness import Safeness
 from src.community_algs.baselines.community_hiding.modularity import Modularity
+
+# TEST 
+from src.community_algs.baselines.community_hiding.safeness_tets import Safeness as SafenessTest
+from src.community_algs.baselines.community_hiding.modularity_test import Modularity as ModularityTest
+
 from src.agent.agent import Agent
 
 from tqdm import trange
@@ -136,11 +141,7 @@ class CommunityHiding():
         # Initialize the Deception Score algorithm
         self.deception_score_obj = DeceptionScore(
             copy.deepcopy(self.community_target))
-        # Initialize the Safeness algorithm
-        # self.safeness_obj = Safeness(
-        #     self.original_graph,
-        #     self.community_target,
-        # )
+        
         self.safeness_obj = Safeness(
             self.community_edge_budget,
             self.original_graph,
@@ -149,10 +150,27 @@ class CommunityHiding():
         )
         
         self.modularity_obj = Modularity(
+            self.community_edge_budget,
             self.original_graph,
             self.community_target,
             self.community_structure,
+            self.agent.env.detection,
         )
+        
+        # TEST
+        # self.safeness_obj = SafenessTest(
+        #     self.community_edge_budget,
+        #     self.original_graph,
+        #     self.community_target,
+        #     self.community_structure,
+        # )
+
+        # self.modularity_obj = ModularityTest(
+        #     self.community_edge_budget,
+        #     self.original_graph,
+        #     self.community_target,
+        #     self.community_structure,
+        # )
     
     def run_experiment(self)->None:
         # Start evaluation
@@ -293,7 +311,7 @@ class CommunityHiding():
         #    community_target=self.community_target,
         #    edge_budget=self.community_edge_budget,
         # )
-        new_graph, steps = self.safeness_obj.com_decept_safeness()
+        new_graph, steps = self.safeness_obj.run()
         
         # Compute the new community structure
         new_communities = self.agent.env.detection.compute_community(new_graph)
@@ -318,10 +336,11 @@ class CommunityHiding():
         Tuple[str, nx.Graph, int, float, int]
             Algorithm name, goal, nmi, deception score, steps
         """
-        new_graph, steps = self.modularity_obj.com_decept_nodec(
-            self.community_edge_budget)
+        new_graph, steps, new_communities = self.modularity_obj.run()
+        # TEST
+        # new_graph, steps = self.modularity_obj.run()
         # Compute the new community structure
-        new_communities = self.agent.env.detection.compute_community(new_graph)
+        # new_communities = self.agent.env.detection.compute_community(new_graph)
 
         # Compute Deception Score between the new community structure and the
         # original one

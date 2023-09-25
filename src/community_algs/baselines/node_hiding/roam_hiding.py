@@ -1,7 +1,6 @@
 import sys
 sys.path.append("../../../")
 from src.community_algs.detection_algs import CommunityDetectionAlgorithm
-from src.community_algs.baselines.community_hiding.test_safeness import Safeness
 from src.utils.utils import Utils, FilePaths, DetectionAlgorithmsNames, HyperParams
 
 import matplotlib.pyplot as plt

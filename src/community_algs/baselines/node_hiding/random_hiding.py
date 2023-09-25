@@ -8,6 +8,7 @@ import networkx as nx
 from cdlib import algorithms
 from typing import List, Callable, Tuple
 import random
+import time
 import copy
 
 class RandomHiding():
@@ -28,17 +29,18 @@ class RandomHiding():
         
     def get_possible_action(self):
         # Put all edge between the target node and its neighbors in a list
-        possible_actions_add = []
+        possible_actions_remove = []
         for neighbor in self.graph.neighbors(self.target_node):
-            possible_actions_add.append((self.target_node, neighbor))
+            possible_actions_remove.append((self.target_node, neighbor))
         
         # Put all the edges that aren't neighbors of the target node in a list
-        possible_actions_remove = []
+        possible_actions_add = []
         for node in self.graph.nodes():
             if node != self.target_node and node not in self.graph.neighbors(self.target_node):
-                possible_actions_remove.append((self.target_node, node))
-        possible_action = possible_actions_add + possible_actions_remove
-        return possible_action
+                possible_actions_add.append((self.target_node, node))
+        possible_actions = possible_actions_add + possible_actions_remove
+
+        return possible_actions
     
     def hide_target_node_from_community(self) -> Tuple[nx.Graph, List[int], int]:
         """
@@ -55,14 +57,17 @@ class RandomHiding():
         communities = self.original_community_structure
         done = False
         steps = self.steps
-        while steps > 0 and not done:
-            # Random choose a edge from the possible edges
-            edge = possible_edges.pop()
+        random.seed(time.time())
+        while steps > 0 and not done:           
+            
+            index = random.randint(0, len(possible_edges)-1)
+            edge = possible_edges.pop(index)
+            
             if graph.has_edge(*edge):
-                # Remove the edge
                 graph.remove_edge(*edge)
+            elif graph.has_edge(*edge[::-1]):
+                graph.remove_edge(*edge[::-1])
             else:
-                # Add the edge
                 graph.add_edge(*edge)
             
             # Compute the new community structure

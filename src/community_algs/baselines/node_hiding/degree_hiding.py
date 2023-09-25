@@ -27,15 +27,15 @@ class DegreeHiding():
         
     def get_possible_action(self):
         # Put all edge between the target node and its neighbors in a list
-        possible_actions_add = []
+        possible_actions_remove = []
         for neighbor in self.graph.neighbors(self.target_node):
-            possible_actions_add.append((self.target_node, neighbor))
+            possible_actions_remove.append((self.target_node, neighbor))
 
         # Put all the edges that aren't neighbors of the target node in a list
-        possible_actions_remove = []
+        possible_actions_add = []
         for node in self.graph.nodes():
             if node != self.target_node and node not in self.graph.neighbors(self.target_node):
-                possible_actions_remove.append((self.target_node, node))
+                possible_actions_add.append((self.target_node, node))
         possible_action = possible_actions_add + possible_actions_remove
         return possible_action
     
@@ -62,14 +62,15 @@ class DegreeHiding():
         while steps > 0 and not done:
             # Choose the edge with the highest degree
             max_tuple = max(possible_edges, key=lambda x: x[2])
-            possible_edges.remove(max_tuple)
-            edge = (max_tuple[0], max_tuple[1])
+            index = possible_edges.index(max_tuple)
+            edge = possible_edges.pop(index)
+            edge = (edge[0], edge[1])
             
             if graph.has_edge(*edge):
-                # Remove the edge
                 graph.remove_edge(*edge)
+            elif graph.has_edge(*edge[::-1]):
+                graph.remove_edge(*edge[::-1])
             else:
-                # Add the edge
                 graph.add_edge(*edge)
 
             # Compute the new community structure

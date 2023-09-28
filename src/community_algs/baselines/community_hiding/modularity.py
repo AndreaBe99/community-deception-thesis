@@ -82,17 +82,17 @@ class Modularity:
         communities = self.community_obj
         while beta > 0:
             deg_C = self.computeandSortComDegrees(graph, communities.communities)
-            Ci = deg_C[0][1]["community"]
-            Cj = deg_C[1][1]["community"]
-            
-            
-            for np in Ci:
-                for nt in Cj:
-                    if np != nt:
-                        if not graph.has_edge(np, nt):
-                            break
-                        
-            MLadd, communities_add, mod_after_add = self.getAddLoss(np, nt, graph)
+            MLadd = -1
+            if len(deg_C) > 1:
+                Ci = deg_C[0][1]["community"]
+                Cj = deg_C[1][1]["community"]
+                for np in Ci:
+                    for nt in Cj:
+                        if np != nt:
+                            if not graph.has_edge(np, nt):
+                                break
+                            
+                MLadd, communities_add, mod_after_add = self.getAddLoss(np, nt, graph)
             
             # Get the edge with the highest value in "gain" key
             MLdel = -1

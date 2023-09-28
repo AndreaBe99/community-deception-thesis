@@ -87,7 +87,10 @@ class Safeness:
         while beta > 0:
             np = self.getNodeMinimumAddRatio(graph)
             nt = self.findExternalNode(graph, np)
-            xi_add_C = self.getAdditionGain(graph, np, nt)
+            if nt is None or np is None:
+                xi_add_C = -1
+            else:
+                xi_add_C = self.getAdditionGain(graph, np, nt)
             
             (nk, nl) = self.getBestDelExclBridges(graph)
             if nk is None and nl is None:

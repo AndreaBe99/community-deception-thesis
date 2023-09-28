@@ -139,6 +139,9 @@ We regard each connected component in a group as a separate ground-truth communi
 
 We regard each connected component in a group as a separate ground-truth community. We remove the ground-truth communities which have less than 3 nodes. We also provide the top 5,000 communities with highest quality which are described in our paper. As for the network, we provide the largest connected component.
 
+## [Network Repository](https://networkrepository.com)
+
+[vote](https://networkrepository.com/soc-wiki-Vote.php): The dataset contains all the Wikipedia voting data from the inception of Wikipedia till January 2008. Nodes in the network represent wikipedia users and a directed edge from node i to node j represents that user i voted on user j.
 
 ### No Dataset Found
 

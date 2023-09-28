@@ -97,8 +97,22 @@ class CommunityHiding():
         self.community_edge_budget = int(math.ceil(self.original_graph.number_of_edges() * \
             (self.beta/100)))
         # Budget for each single node
-        self.node_edge_budget = int(math.ceil(self.community_edge_budget / len(
-            self.community_target)))
+        # self.node_edge_budget = int(math.ceil(self.community_edge_budget / len(self.community_target)))
+        
+        # TEST 1: Set the node budge as the community budget 
+        self.node_edge_budget = self.community_edge_budget
+        
+        # TEST 2: Set the node budge proportionally to the degree of each node
+        # Compute a dictionary where the keys are the nodes of the graph and the
+        # values are the degree of the nodes
+        # Calculate the total degree of all nodes in the graph
+        # total_degree = sum(dict(self.original_graph.subgraph(self.community_target).degree()).values())
+        # Distribute the budget proportionally to each node based on their degree
+        # budget_per_node = {}
+        # for node in self.community_target:
+        #     degree = self.original_graph.degree(node)
+        #     proportion = degree / total_degree
+        #     budget_per_node[node] = int(self.community_edge_budget * proportion)
         
         # We can't call the set_rewiring_budget function because we don't have
         # the beta value multiplier, and also we need to adapt to the Community
@@ -120,8 +134,8 @@ class CommunityHiding():
 
         self.path_to_save = FilePaths.TEST_DIR.value + \
             f"{self.env_name}/{self.detection_alg}/" + \
-            f"tau_{self.tau}/" + \
             f"community_hiding/" + \
+            f"tau_{self.tau}/" + \
             f"beta_{self.beta}/" + \
             f"eps_{self.epsilon_prob}/" + \
             f"lr_{self.lr}/gamma_{self.gamma}/" + \
@@ -157,20 +171,22 @@ class CommunityHiding():
             self.agent.env.detection,
         )
         
-        # TEST
-        # self.safeness_obj = SafenessTest(
-        #     self.community_edge_budget,
-        #     self.original_graph,
-        #     self.community_target,
-        #     self.community_structure,
-        # )
+        # TEST 1:
+        # Compute a Dictionary where the keys are the nodes of the community
+        # target and the values are the centrality of the nodes
+        node_centralities = nx.centrality.degree_centrality(
+            self.original_graph)
+        # Get the subset of the dictionary with only the nodes of the community
+        node_com_centralities = {
+            k: node_centralities[k] for k in self.community_target}
+        # Order in descending order the dictionary
+        self.node_com_centralities = dict(
+            sorted(
+                node_com_centralities.items(),
+                key=lambda item: item[1],
+                reverse=True)
+        )
 
-        # self.modularity_obj = ModularityTest(
-        #     self.community_edge_budget,
-        #     self.original_graph,
-        #     self.community_target,
-        #     self.community_structure,
-        # )
     
     def run_experiment(self)->None:
         # Start evaluation
@@ -261,7 +277,11 @@ class CommunityHiding():
         # Initialize the new community structure as the original one, because
         # the agent could not perform any rewiring
         communities = self.community_structure
-        for node in self.community_target:
+        
+        # As first node to hide, we choose the node with the highest centrality
+        # in the target community
+        node = self.node_com_centralities.popitem()[0]
+        while True:
             self.agent.env.node_target = node
             # The agent possible action are changed in the test function, which
             # calls the reset function of the environment
@@ -273,8 +293,31 @@ class CommunityHiding():
                 epsilon_prob=self.epsilon_prob,
                 model_path=self.model_path,
             )
-            # print("Node {} - Steps: {}".format(node, agent.step))
-            tot_steps += self.agent.step
+            
+            # Get the new community structure
+            new_communities = self.agent.env.new_community_structure
+            # Check if the agent performed any rewiring
+            if new_communities is None:
+                new_communities = communities
+            # Get the community in the new community structure, which contains
+            # the highest number of nodes of the target community
+            new_community = max(new_communities.communities, key=lambda c: sum(
+                1 for n in self.community_target if n in c))
+            
+            # Recompute the node centralities after the rewiring
+            node_centralities = nx.centrality.degree_centrality(new_graph)
+            # Choose the next node to hide, as the node with the highest 
+            # centrality in the new community
+            node = max(
+                (n for n in new_community if n in self.community_target), 
+                key=lambda n: node_centralities[n])
+            
+            # Increment the total steps
+            tot_steps += self.agent.env.used_edge_budget
+            
+            # Reduce the edge budget
+            self.agent.env.edge_budget = self.node_edge_budget - tot_steps
+            
             if tot_steps >= self.community_edge_budget:
                 if self.agent.env.new_community_structure is None:
                     # The agent did not perform any rewiring, i.e. are the same communities
@@ -284,6 +327,34 @@ class CommunityHiding():
                     agent_goal_reached = True
                 communities = self.agent.env.new_community_structure
                 break
+            
+            
+        
+        # OLD CODE
+        # for node in self.community_target:
+        #     self.agent.env.node_target = node
+        #     # The agent possible action are changed in the test function, which
+        #     # calls the reset function of the environment
+        #     new_graph = self.agent.test(
+        #         lr=self.lr,
+        #         gamma=self.gamma,
+        #         lambda_metric=self.lambda_metric,
+        #         alpha_metric=self.alpha_metric,
+        #         epsilon_prob=self.epsilon_prob,
+        #         model_path=self.model_path,
+        #     )
+        #     # print("Node {} - Steps: {}".format(node, agent.step))
+        #     tot_steps += self.agent.step
+        #     if tot_steps >= self.community_edge_budget:
+        #         if self.agent.env.new_community_structure is None:
+        #             # The agent did not perform any rewiring, i.e. are the same communities
+        #             agent_goal_reached = False
+        #             break
+        #         if self.community_target not in self.agent.env.new_community_structure.communities:
+        #             agent_goal_reached = True
+        #         communities = self.agent.env.new_community_structure
+        #         break
+        
         # Compute Deception Score between the new community structure and the
         # original one
         deception_score = self.deception_score_obj.get_deception_score(

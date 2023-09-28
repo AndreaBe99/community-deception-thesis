@@ -8,6 +8,7 @@ from src.community_algs.baselines.node_hiding.roam_hiding import RoamHiding
 
 from typing import List, Callable, Tuple
 from tqdm import trange
+import multiprocessing
 import networkx as nx
 import cdlib
 import time
@@ -83,8 +84,8 @@ class NodeHiding():
         
         self.path_to_save = FilePaths.TEST_DIR.value + \
             f"{self.env_name}/{self.detection_alg}/" + \
-            f"tau_{self.tau}/" + \
             f"node_hiding/" + \
+            f"tau_{self.tau}/" + \
             f"beta_{self.beta}/" + \
             f"eps_{self.epsilon_prob}/" + \
             f"lr_{self.lr}/gamma_{self.gamma}/" + \
@@ -155,6 +156,7 @@ class NodeHiding():
                 f"* * * Testing Episode {step+1} | Roam Rewiring")
             self.run_alg(self.run_roam)
 
+
         Utils.check_dir(self.path_to_save)
         Utils.save_test(
             log=self.log_dict,
@@ -163,6 +165,7 @@ class NodeHiding():
             algs=self.evaluation_algs,
             metrics=["nmi", "goal", "time", "steps"])
     
+    # Define a function to run each algorithm
     def run_alg(self, function: Callable) -> None:
         """
         Wrapper function to run the evaluation of a generic algorithm
@@ -206,7 +209,7 @@ class NodeHiding():
             epsilon_prob=self.epsilon_prob,
             model_path=self.model_path,
         )
-        return self.evaluation_algs[0], self.agent.env.new_community_structure, self.agent.step
+        return self.evaluation_algs[0], self.agent.env.new_community_structure, self.agent.env.used_edge_budget
     
     ############################################################################
     #                               BASELINES                                  #

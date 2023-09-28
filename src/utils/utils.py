@@ -31,7 +31,9 @@ class FilePaths(Enum):
     # ! Trained model path for testing (change the following line to change the model)
     # MODEL_PATH = "lfr_benchmark_node-200/tau-0.99_beta-30/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
     # MODEL_PATH = "kar/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
-    MODEL_PATH = "words/walktrap/eps-25/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/model.pth"
+    # MODEL_PATH = "words/walktrap/eps-25/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/model.pth"
+    # MODEL_PATH = "steps:10000/words/walktrap/eps-0/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/model.pth"
+    MODEL_PATH = "steps:10000/words/greedy/eps-0/lr-0.0007/gamma-0.95/lambda-0.1/alpha-0.7/model.pth"
     TRAINED_MODEL = LOG_DIR + MODEL_PATH
     
     # Dataset file paths
@@ -47,6 +49,7 @@ class FilePaths(Enum):
     # POLB = DATASETS_DIR + '/polb.gml'
     WORDS = DATASETS_DIR + '/words.mtx'
     # WORDS = DATASETS_DIR + '/words.gml'
+    VOTE = DATASETS_DIR + '/vote.mtx'
     # NETS = DATASETS_DIR + '/nets.mtx'
     NETS = DATASETS_DIR + '/nets.gml'
     ERDOS = DATASETS_DIR + '/erdos.mtx'
@@ -97,7 +100,7 @@ class SimilarityFunctionsNames(Enum):
 class HyperParams(Enum):
     """Hyperparameters for the Environment"""
     # ! REAL GRAPH Graph path (change the following line to change the graph)
-    GRAPH_NAME = FilePaths.MAD.value
+    GRAPH_NAME = FilePaths.VOTE.value
     # ! Define the detection algorithm to use (change the following line to change the algorithm)
     DETECTION_ALG_NAME = DetectionAlgorithmsNames.GRE.value
     # Multiplier for the rewiring action number, i.e. (mean_degree * BETA)
@@ -120,7 +123,7 @@ class HyperParams(Enum):
 
     """ Agent Parameters"""
     # Chaneg target community and target node with a probability of EPSILON
-    EPSILON = [25]    # Between 0 and 100
+    EPSILON = [0]    # Between 0 and 100
     # Networl Architecture
     HIDDEN_SIZE_1 = 64
     HIDDEN_SIZE_2 = 64
@@ -132,11 +135,11 @@ class HyperParams(Enum):
     BEST_REWARD = -np.inf
     # ° Hyperparameters  Testing ° #
     # ! Learning rate, it controls how fast the network learns
-    LR = [1e-4] # [1e-7, 1e-4, 1e-1]
+    LR = [7e-4] # [1e-7, 1e-4, 1e-1]
     # ! Discount factor:
     # - 0: only the reward on the next step is important
     # - 1: a reward in the future is as important as a reward on the next step
-    GAMMA = [0.9] # [0.9, 0.95]
+    GAMMA = [0.95] # [0.9, 0.95]
     
     """ Training Parameters """
     # Number of episodes to collect experience
@@ -174,7 +177,7 @@ class HyperParams(Enum):
     """Graph Generation Parameters"""
     # ! Change the following parameters to modify the graph
     # Number of nodes
-    N_NODE = 500
+    N_NODE = 150
     # Power law exponent for the degree distribution of the created graph.
     TAU1 = 2
     # Power law exponent for the community size distribution in the created graph.
@@ -183,11 +186,11 @@ class HyperParams(Enum):
     MU = 0.1
 
     # Desired average degree of nodes in the created graph.
-    AVERAGE_DEGREE = int(0.05 * N_NODE)  # 20
+    AVERAGE_DEGREE = int(0.035 * N_NODE)  # 20
     # Minimum degree of nodes in the created graph
     MIN_DEGREE = None  # 30
     # Maximum degree of nodes in the created graph
-    MAX_DEGREE = int(0.19 * N_NODE)
+    MAX_DEGREE = int(0.1 * N_NODE)
 
     # Minimum size of communities in the graph.
     MIN_COMMUNITY = int(0.05 * N_NODE)
@@ -302,7 +305,7 @@ class Utils:
         # ! FOR KAGGLE NOTEBOOK
         # file_path = f"/kaggle/working/lfr_benchmark_node-{n}.mtx"
         # Write .gml file
-        nx.write_gml(graph, f"{file_path}.gml")
+        # nx.write_gml(graph, f"{file_path}.gml")
         # Write .mtx file
         nx.write_edgelist(graph, f"{file_path}.mtx", data=False)
         

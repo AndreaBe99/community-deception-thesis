@@ -269,10 +269,10 @@ class Agent:
             # With probability epsilon=0.3, change the community target and the
             # node target
             if random.randint(0, 100) < self.epsilon_prob:
-                if mean_avg_reward > 0 or mean_avg_reward_steps > episode/100:
-                    self.env.change_target_community()
-                    mean_avg_reward = 0
-                    mean_avg_reward_steps = 0
+                # if mean_avg_reward > 0 or mean_avg_reward_steps > episode/100:
+                self.env.change_target_community()
+                #    mean_avg_reward = 0
+                #    mean_avg_reward_steps = 0
             
             # Print node_target and community_target
             # print("* Node target:", self.env.node_target)
@@ -344,9 +344,11 @@ class Agent:
             edge = (self.env.node_target, action_rl)
             if edge in self.env.possible_actions["ADD"]:
                 if not self.env.graph.has_edge(*edge):
+                    # print("* ADD", edge)
                     self.action_list["ADD"].append(edge)
             elif edge in self.env.possible_actions["REMOVE"]:
                 if self.env.graph.has_edge(*edge):
+                    # print("* REMOVE", edge)
                     self.action_list["REMOVE"].append(edge)
         
         # Take action in environment
@@ -359,6 +361,9 @@ class Agent:
         self.rewards.append(reward)
         # Used for logging
         self.episode_rewards.append(reward)
+        # if test and reward > -1:
+        #    self.step += 1
+        # elif not test:
         self.step += 1
         # print("STEP", self.step, "  GOAL:", self.goal, "  DONE:", self.done, "  REWARD:", reward)
 
@@ -470,8 +475,6 @@ class Agent:
         # target community
         while not self.done and self.step < self.env.max_steps:
             self.rewiring(test=True)
-        # if self.step >= self.env.max_steps:
-        #     print("* !!!Maximum number of steps reached!!!")
         return self.obs
 
     ############################################################################

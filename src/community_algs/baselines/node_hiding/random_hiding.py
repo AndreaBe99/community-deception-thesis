@@ -60,8 +60,11 @@ class RandomHiding():
         random.seed(time.time())
         while steps > 0 and not done:           
             
-            index = random.randint(0, len(possible_edges)-1)
-            edge = possible_edges.pop(index)
+            # index = random.randint(0, len(possible_edges)-1)
+            # edge = possible_edges.pop(index)
+            edge = random.choice(possible_edges)
+            possible_edges.remove(edge)
+            
             
             if graph.has_edge(*edge):
                 graph.remove_edge(*edge)

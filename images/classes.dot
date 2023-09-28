@@ -1,0 +1,43 @@
+digraph "classes" {
+rankdir=BT
+charset="utf-8"
+"src.agent.a2c.a2c.ActorCritic" [color="coral", fontcolor="black", label=<ActorCritic>, shape="record", style="filled"];
+"src.agent.a2c.actor.ActorNetwork" [color="coral", fontcolor="black", label=<ActorNetwork>, shape="record", style="filled"];
+"src.agent.agent.Agent" [color="coral", fontcolor="black", label=<Agent>, shape="record", style="filled"];
+"src.community_algs.detection_algs.CommunityDetectionAlgorithm" [color="cornflowerblue", fontcolor="black", label=<CommunityDetectionAlgorithm>, shape="record", style="filled"];
+"src.utils.hiding_community.CommunityHiding" [color="mediumspringgreen", fontcolor="black", label=<CommunityHiding>, shape="record", style="filled"];
+"src.agent.a2c.critic.CriticNetwork" [color="coral", fontcolor="black", label=<CriticNetwork>, shape="record", style="filled"];
+"src.community_algs.baselines.node_hiding.degree_hiding.DegreeHiding" [color="gold", fontcolor="black", label=<DegreeHiding>, shape="record", style="filled"];
+"src.community_algs.detection_algs.DetectionAlgorithm" [color="cornflowerblue", fontcolor="black", label=<DetectionAlgorithm>, shape="record", style="filled"];
+"src.utils.utils.DetectionAlgorithmsNames" [color="cornflowerblue", fontcolor="black", label=<DetectionAlgorithmsNames>, shape="record", style="filled"];
+"src.utils.utils.FilePaths" [color="cornflowerblue", fontcolor="black", label=<FilePaths>, shape="record", style="filled"];
+"src.agent.a2c.graph_encoder.GraphEncoder" [color="cornflowerblue", fontcolor="black", label=<GraphEncoder>, shape="record", style="filled"];
+"src.environment.graph_env.GraphEnvironment" [color="cornflowerblue", fontcolor="black", label=<GraphEnvironment>, shape="record", style="filled"];
+"src.utils.utils.HyperParams" [color="cornflowerblue", fontcolor="black", label=<HyperParams>, shape="record", style="filled"];
+"src.community_algs.baselines.community_hiding.modularity_test.Modularity" [color="cornflowerblue", fontcolor="black", label=<Modularity>, shape="record", style="filled"];
+"src.community_algs.baselines.community_hiding.modularity.Modularity" [color="mediumspringgreen", fontcolor="black", label=<Modularity>, shape="record", style="filled"];
+"src.utils.hiding_node.NodeHiding" [color="gold", fontcolor="black", label=<NodeHiding>, shape="record", style="filled"];
+"src.community_algs.baselines.community_hiding.permanence.PermanenceCalculator" [color="cornflowerblue", fontcolor="black", label=<PermanenceCalculator>, shape="record", style="filled"];
+"src.community_algs.baselines.node_hiding.random_hiding.RandomHiding" [color="gold", fontcolor="black", label=<RandomHiding>, shape="record", style="filled"];
+"src.community_algs.baselines.node_hiding.roam_hiding.RoamHiding" [color="gold", fontcolor="black", label=<RoamHiding>, shape="record", style="filled"];
+"src.community_algs.baselines.community_hiding.safeness.Safeness" [color="mediumspringgreen", fontcolor="black", label=<Safeness>, shape="record", style="filled"];
+"src.community_algs.baselines.community_hiding.safeness_tets.Safeness" [color="cornflowerblue", fontcolor="black", label=<Safeness>, shape="record", style="filled"];
+"src.utils.utils.SimilarityFunctionsNames" [color="cornflowerblue", fontcolor="black", label=<SimilarityFunctionsNames>, shape="record", style="filled"];
+"src.utils.utils.Utils" [color="cornflowerblue", fontcolor="black", label=<Utils>, shape="record", style="filled"];
+"src.agent.a2c.a2c.ActorCritic" -> "src.agent.agent.Agent" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="policy", style="solid"];
+"src.agent.a2c.a2c.ActorCritic" -> "src.agent.agent.Agent" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="policy", style="solid"];
+"src.agent.a2c.actor.ActorNetwork" -> "src.agent.a2c.a2c.ActorCritic" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="actor", style="solid"];
+"src.agent.a2c.critic.CriticNetwork" -> "src.agent.a2c.a2c.ActorCritic" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="critic", style="solid"];
+"src.community_algs.baselines.community_hiding.modularity.Modularity" -> "src.utils.hiding_community.CommunityHiding" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="modularity_obj", style="solid"];
+"src.community_algs.baselines.community_hiding.safeness.Safeness" -> "src.utils.hiding_community.CommunityHiding" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="safeness_obj", style="solid"];
+"src.community_algs.baselines.node_hiding.degree_hiding.DegreeHiding" -> "src.utils.hiding_node.NodeHiding" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="degree_hiding", style="solid"];
+"src.community_algs.baselines.node_hiding.random_hiding.RandomHiding" -> "src.utils.hiding_node.NodeHiding" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="random_hiding", style="solid"];
+"src.community_algs.baselines.node_hiding.roam_hiding.RoamHiding" -> "src.utils.hiding_node.NodeHiding" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="roam_hiding", style="solid"];
+"src.community_algs.detection_algs.CommunityDetectionAlgorithm" -> "src.community_algs.baselines.node_hiding.roam_hiding.RoamHiding" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="detection_alg", style="solid"];
+"src.community_algs.detection_algs.CommunityDetectionAlgorithm" -> "src.environment.graph_env.GraphEnvironment" [arrowhead="diamond", arrowtail="none", fontcolor="gray", label="detection", style="solid"];
+"src.agent.agent.Agent" -> "src.utils.hiding_community.CommunityHiding" [arrowhead="odiamond", arrowtail="none", fontcolor="gray", label="agent", style="solid"];
+"src.agent.agent.Agent" -> "src.utils.hiding_node.NodeHiding" [arrowhead="odiamond", arrowtail="none", fontcolor="gray", label="agent", style="solid"];
+"src.environment.graph_env.GraphEnvironment" -> "src.agent.agent.Agent" [arrowhead="odiamond", arrowtail="none", fontcolor="gray", label="env", style="solid"];
+"src.environment.graph_env.GraphEnvironment" -> "src.community_algs.baselines.node_hiding.degree_hiding.DegreeHiding" [arrowhead="odiamond", arrowtail="none", fontcolor="gray", label="env", style="solid"];
+"src.environment.graph_env.GraphEnvironment" -> "src.community_algs.baselines.node_hiding.random_hiding.RandomHiding" [arrowhead="odiamond", arrowtail="none", fontcolor="gray", label="env", style="solid"];
+}

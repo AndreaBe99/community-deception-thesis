@@ -175,3 +175,10 @@ test_*.md
 repo/
 old_test/
 agent_test/
+centrality_full_budget_v1/
+centrality_full_budget_v2/
+degree_distributed_budget/
+
+test/degree_full_budget/vote/greedy/community_hiding/
+test/degree_full_budget/vote/louvain/community_hiding/
+test/degree_full_budget/vote/walktrap/community_hiding/

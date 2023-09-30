@@ -86,11 +86,15 @@ class Modularity:
             if len(deg_C) > 1:
                 Ci = deg_C[0][1]["community"]
                 Cj = deg_C[1][1]["community"]
+                break_outer_loop = False
                 for np in Ci:
                     for nt in Cj:
                         if np != nt:
                             if not graph.has_edge(np, nt):
+                                break_outer_loop = True
                                 break
+                    if break_outer_loop:
+                        break
                             
                 MLadd, communities_add, mod_after_add = self.getAddLoss(np, nt, graph)
             

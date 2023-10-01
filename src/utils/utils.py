@@ -29,12 +29,7 @@ class FilePaths(Enum):
     # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/"
     
     # ! Trained model path for testing (change the following line to change the model)
-    # MODEL_PATH = "lfr_benchmark_node-200/tau-0.99_beta-30/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
-    # MODEL_PATH = "kar/greedy/lr-0.0001/gamma-0.7/lambda-0.1/alpha-0.7/model.pth"
-    # MODEL_PATH = "words/walktrap/eps-25/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/model.pth"
-    # MODEL_PATH = "steps:10000/words/walktrap/eps-0/lr-0.0001/gamma-0.9/lambda-0.1/alpha-0.7/model.pth"
-    MODEL_PATH = "steps:10000/words/greedy/eps-0/lr-0.0007/gamma-0.95/lambda-0.1/alpha-0.7/model.pth"
-    TRAINED_MODEL = LOG_DIR + MODEL_PATH
+    TRAINED_MODEL = "src/models/steps-10000_words-gre_eps-0_model.pth"
     
     # Dataset file paths
     KAR = DATASETS_DIR + '/kar.mtx'

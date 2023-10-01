@@ -178,7 +178,5 @@ agent_test/
 centrality_full_budget_v1/
 centrality_full_budget_v2/
 
-test/degree_distributed_budget/vote/
-
 # EXCLUDE USELESS CODE
 manually/

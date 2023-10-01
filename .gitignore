@@ -177,7 +177,9 @@ old_test/
 agent_test/
 centrality_full_budget_v1/
 centrality_full_budget_v2/
-degree_distributed_budget/
+
+test/degree_distributed_budget/kar/
+test/degree_distributed_budget/vote/
 
 # EXCLUDE USELESS CODE
 manually/

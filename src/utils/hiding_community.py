@@ -106,7 +106,7 @@ class CommunityHiding():
         # target community. So we set manually all the values of set_rewiring_budget
         # function.
         self.agent.env.edge_budget = self.node_edge_budget
-        self.agent.env.max_steps = self.node_edge_budget
+        # ! self.agent.env.max_steps = self.agent.env.original_graph.number_of_edges()
         self.agent.env.used_edge_budget = 0
         self.agent.env.stop_episode = False
         self.agent.env.reward = 0
@@ -157,7 +157,6 @@ class CommunityHiding():
         )
         
         # ! UNCOMMENT
-        """
         # Compute a Dictionary where the keys are the nodes of the community
         # target and the values are the centrality of the nodes
         node_centralities = nx.centrality.degree_centrality(
@@ -172,11 +171,10 @@ class CommunityHiding():
                 key=lambda item: item[1],
                 reverse=True)
         )
-        """
         
         # ! Compute the budget for each node in the target community, for the
         # function run_agent_distributed_budget()
-        self.compute_budget_proportionally(self.original_graph, self.community_target)
+        # self.compute_budget_proportionally(self.original_graph, self.community_target)
         
     def compute_budget_proportionally(
         self, 
@@ -231,8 +229,8 @@ class CommunityHiding():
             steps.set_description(
                 f"* * * Testing Episode {step+1} | Agent Rewiring")
             # ! UNCOMMENT
-            # self.run_alg(self.run_agent)
-            self.run_alg(self.run_agent_distributed_budget)
+            self.run_alg(self.run_agent)
+            # self.run_alg(self.run_agent_distributed_budget)
             
             # ° --------- Baselines --------- ° #
             # Check if the beta value is already computed, if yes, skip
@@ -343,7 +341,8 @@ class CommunityHiding():
             node = max(
                 (n for n in new_community if n in self.community_target), 
                 key=lambda n: node_centralities[n])
-            # Increment the total steps
+            # ! Increment the total steps
+            # tot_steps += self.agent.step
             tot_steps += self.agent.env.used_edge_budget
             # Reduce the edge budget
             self.agent.env.edge_budget = self.node_edge_budget - tot_steps

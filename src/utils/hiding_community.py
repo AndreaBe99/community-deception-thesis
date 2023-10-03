@@ -346,7 +346,8 @@ class CommunityHiding():
             tot_steps += self.agent.env.used_edge_budget
             # Reduce the edge budget
             self.agent.env.edge_budget = self.node_edge_budget - tot_steps
-            
+            # print("Edge Budget Used:", self.agent.env.used_edge_budget)
+            # print("Agent Steps:", self.agent.step)
             # Check if the agent reached the goal
             if tot_steps >= self.community_edge_budget or node is None:
                 if self.agent.env.new_community_structure is None:

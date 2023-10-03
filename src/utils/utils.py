@@ -59,6 +59,7 @@ class FilePaths(Enum):
     # ASTR = DATASETS_DIR + '/astr.mtx'
     # AMZ = DATASETS_DIR + '/amz.mtx'
     # YOU = DATASETS_DIR + '/you.mtx'
+    YOU = DATASETS_DIR + '/you.txt'
     # ORK = DATASETS_DIR + '/ork.mtx'
 
 
@@ -111,7 +112,7 @@ class HyperParams(Enum):
     # will have, compared with the distance between graphs
     ALPHA = [0.7] # [0.3, 0.5, 0.7]
     # Multiplier for the number of maximum steps allowed
-    MAX_STEPS_MUL = 2
+    MAX_STEPS_MUL = 5
     
     """ Graph Encoder Parameters """""
     EMBEDDING_DIM = 128 # 256
@@ -218,7 +219,9 @@ class Utils:
         """
         # try:
         # Check if the graph file is in the .mtx format or .gml
-        if file_path.endswith(".mtx"):
+        if file_path.endswith(".txt"):
+            graph = nx.read_edgelist(file_path)
+        elif file_path.endswith(".mtx"):
             graph_matrix = scipy.io.mmread(file_path)
             graph = nx.Graph(graph_matrix)
         elif file_path.endswith(".gml"):

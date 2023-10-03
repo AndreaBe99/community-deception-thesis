@@ -300,6 +300,9 @@ class GraphEnvironment(object):
             graph, graph_path = Utils.generate_lfr_benchmark_graph()
         else:
             graph = Utils.import_mtx_graph(graph_path)
+            
+        graph = nx.convert_node_labels_to_integers(
+            graph, first_label=0, ordering='sorted', label_attribute="node_type")
 
         self.env_name = graph_path.split("/")[-1].split(".")[0]
         self.graph = self.set_node_features(graph)

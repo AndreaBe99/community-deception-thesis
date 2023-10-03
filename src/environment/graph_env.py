@@ -385,7 +385,7 @@ class GraphEnvironment(object):
         self.used_edge_budget = 0
         # Max Rewiring Steps during an episode, set a limit to avoid infinite
         # episodes in case the agent does not find the target node
-        self.max_steps = self.graph.number_of_edges()  # self.edge_budget
+        self.max_steps = self.edge_budget * HyperParams.MAX_STEPS_MUL.value # self.graph.number_of_edges()
         # Whether the budget for the graph rewiring is exhausted, or the target
         # node does not belong to the community anymore
         self.stop_episode = False

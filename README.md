@@ -19,7 +19,7 @@ The aim of community deception is to formulate a function $h_{\theta}(\cdot)$, p
 
 ## Model Architecture
 
-![Model Architecture](images/A2C_background.png)
+![Model Architecture](images/model_architecture.png)
 
 To tackle this problem, we have used the **Advantage Actor-Critic** (A2C) algorithm, a popular reinforcement learning technique that combines the advantages of both policy-based and value-based methods. It can be defined as:
 
@@ -36,6 +36,9 @@ comprising two neural networks, one for the policy ($\pi_{\theta}$) and another 
 - **Policy (Actor)**: The policy is a neural network that takes the graph embedding as input and yields a probability distribution over actions to be undertaken. Specifically, the policy consists of two fully connected layers with ReLU activation functions and an output layer with SoftMax activation. The output layer has a dimension equal to the number of nodes in the graph, representing the probability distribution over actions. The policy is specifically trained to predict the probability that node $v$ is the optimal node to form the edge $(u, v)$, either to add or remove it, to hide node $u$ from its initial community. Depending on the input node $u$, the feasible actions are a subset of the graph's edges; hence, not all nodes $v \in V$ are potential actions for the policy.
 - **Value (Critic)**: This network is nearly identical to the one used for the policy, with the only distinction being that the output layer has a dimension of $1$, representing the estimated value of the value function. The value function is trained to predict the state-value given a certain action $a$ and a state $s$.
 
+![UML](images/uml_classes.png)
+
+
 ## Requirements
 
 To install requirements:
@@ -51,12 +54,14 @@ To train the model, run the following command:
 ```bash
 python main.py --mode "train"
 ```
+to modify the parameters of the model, please refer to the `src/utils/utils.py` file.
 
 While, to test the model, run the following command:
 
 ```bash
 python main.py --mode "test"
 ```
+to modify the parameters of the model, please refer to the `main.py` file.
 
 ## References
 

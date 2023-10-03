@@ -58,6 +58,7 @@ class FilePaths(Enum):
     # DBLP = DATASETS_DIR + '/dblp.mtx'
     # ASTR = DATASETS_DIR + '/astr.mtx'
     # AMZ = DATASETS_DIR + '/amz.mtx'
+    AMZ = DATASETS_DIR + '/amz.txt'
     # YOU = DATASETS_DIR + '/you.mtx'
     YOU = DATASETS_DIR + '/you.txt'
     # ORK = DATASETS_DIR + '/ork.mtx'

@@ -13,7 +13,7 @@ import igraph as ig
 import matplotlib.pyplot as plt
 plt.style.use('default')
 
-
+'''
 class CommunityDetectionAlgorithm(object):
     """Class for the community detection algorithms using CDLIB"""
     def __init__(self, alg_name: str) -> None:
@@ -66,9 +66,9 @@ class CommunityDetectionAlgorithm(object):
         #    return self.compute_scd(graph)
         else:
             raise ValueError('Invalid algorithm name')
-    
+'''
 
-class DetectionAlgorithm(object):
+class CommunityDetectionAlgorithm(object):
     """Class for the community detection algorithms using iGraph"""
     
     def __init__(self, alg_name: str) -> None:
@@ -146,7 +146,7 @@ class DetectionAlgorithm(object):
         else:
             raise ValueError('Invalid algorithm name')
 
-    def vertexcluster_to_list(self, cluster: ig.VertexClustering) -> List[List[int]]:
+    def vertexcluster_to_list(self, cluster: ig.VertexClustering) -> cdlib.NodeClustering:
         """
         Convert iGraph.VertexClustering object to list of list of vertices in each cluster
 
@@ -160,7 +160,10 @@ class DetectionAlgorithm(object):
         List[List[int]]
             list of list of vertices in each cluster
         """
-        return [c for c in cluster]
+        com_list = [c for c in cluster]
+        # Create a NodeClustering object
+        node_cluster = cdlib.NodeClustering(com_list, self.ig_graph)
+        return node_cluster
 
     def plot_graph(self) -> plt:
         """Plot the graph using iGraph
@@ -200,9 +203,9 @@ class DetectionAlgorithm(object):
             list of list of vertices in each cluster
         """
         if args_louv is None:
-            louv = graph.community_leiden()
+            louv = graph.community_multilevel()
         else:
-            louv = graph.community_leiden(**args_louv)
+            louv = graph.community_multilevel(**args_louv)
         return self.vertexcluster_to_list(louv)
 
     def compute_walk(self, graph: ig.Graph, args_walk: dict) -> List[List[int]]:

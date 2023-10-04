@@ -11,10 +11,11 @@ Therefore, our primary focus is on making changes to the graph's structure, repr
 ## Problem Formulation
 
 Let $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ be a graph and $f(\mathcal{G}) = \{\mathcal{C}_1,\ldots,\mathcal{C}_k\}$ denote the community arrangement derived from applying a detection algorithm $f(\cdot)$ to $\mathcal{G}$.
-Furthermore, suppose that $f$ has identified node $u\in \mathcal{V}$ as a member of the community $\mathcal{C}_i\in f(\mathcal{G})$ -- i.e., $i^*_u = i$ -- denoted as $u\in \mathcal{C}_i$.
-The aim of community membership hiding is to formulate a function $h_{\theta}(\cdot)$, parametrized by $\theta$, that takes as input the initial graph $\mathcal{G}$ and produces as output a \textit{new} graph $h_{\theta}(\mathcal{G}) = \mathcal{G'} = (\mathcal{V}, \mathcal{E'})$. Among all the possible graphs, we seek the one which, when input to the community detection algorithm $f$, disassociates a target node $u$ from its original community $\mathcal{C}_i$. %, the community detection algorithm $f$, the target node $u$, and the community $\mathcal{C}_i$, from which we intend to disassociate $u$. The output produced by $h$ manifests as a \textit{new} graph $\mathcal{G}' = (\mathcal{V}, \mathcal{E'})$ such that $f(\mathcal{G}') \neq f(\mathcal{G})$.
-To achieve that goal, suppose that the target node $u$ is associated with a new community $\mathcal{C}'_i \in f(\mathcal{G}')$. %, such that $\mathcal{C}'_i \neq \mathcal{C}_i$.
-Hence, we can define the objective of community membership hiding by establishing a threshold for the similarity between $\mathcal{C}'_i$ and $\mathcal{C}_i$, excluding the target node $u$, which, by definition, belongs to both communities. In other words, we set a condition: $sim(\mathcal{C}_i\setminus \{u\}, \mathcal{C}'_i \setminus \{u\}) \leq \tau$, where $\tau \in [0,1]$.
+Furthermore, suppose that $f$ has identified node $u \in \mathcal{V}$ as a member of the community $\mathcal{C}_i \in f(\mathcal{G})$, i.e., $i^*_u = i$, denoted as $u \in \mathcal{C}_i$.
+The aim of community membership hiding is to formulate a function $h_{\theta}(\cdot)$, parametrized by $\theta$, that takes as input the initial graph $\mathcal{G}$ and produces as output a *new* graph $h_{\theta}(\mathcal{G}) = \mathcal{G'} = (\mathcal{V}, \mathcal{E'})$. Among all the possible graphs, we seek the one which, when input to the community detection algorithm $f$, disassociates a target node $u$ from its original community $\mathcal{C}_i$. 
+
+To achieve that goal, suppose that the target node $u$ is associated with a new community $\mathcal{C}'_i \in f(\mathcal{G}')$.
+Hence, we can define the objective of community membership hiding by establishing a threshold for the similarity between $\mathcal{C}'_i$ and $\mathcal{C}_i$, excluding the target node $u$, which, by definition, belongs to both communities. In other words, we set a condition: $sim(\mathcal{C}_i \setminus \{u\}, \mathcal{C}'_i \setminus \{u\}) \leq \tau$, where $\tau \in [0,1]$.
 
 We assume $sim(\cdot, \cdot)$ ranges between $0$ and $1$.
 

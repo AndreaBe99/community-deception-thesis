@@ -1,26 +1,36 @@
-# Community Deception
+# Community Membership Hiding and Community Deception
 
 ## Introduction
 
-This repository contains the code for the thesis "Community Deception" for the Master's Degree in Computer Science at Università La Sapienza di Roma.
+This repository contains the code for the thesis **Community Deception on online Social Networks** for the Master's Degree in Computer Science at Università La Sapienza di Roma.
 
-In a nutshell, community deception aims to enable a target node within a graph to elude being recognized as a member of a particular node cluster, as determined by a community detection algorithm.
+In a nutshell, community membership hiding aims to enable a target node within a graph to elude being recognized as a member of a particular node cluster, as determined by a community detection algorithm.
 This objective is accomplished by granting the node in question the ability to strategically modify its connections with other nodes.
-Therefore, our primary focus is on making changes to the graph's structure represented by the adjacency matrix. While the alteration of node features holds potential interest, that aspect is reserved for future exploration.
+Therefore, our primary focus is on making changes to the graph's structure, represented by the adjacency matrix. While the alteration of node features holds potential interest, that aspect is reserved for future exploration.
 
-More formally, let $G (\mathcal{V}, \mathcal{E})$ be a graph and $f(\mathcal{G}) = \{\mathcal{C}_1,\ldots,\mathcal{C}_k\}$ denote the community arrangement derived from applying a detection algorithm $f(\cdot)$ to $\mathcal{G}$.
+## Problem Formulation
 
-Furthermore, suppose that $f$ has identified node $u\in \mathcal{V}$ as a member of the community $\mathcal{C}_i \in f(\mathcal{G})$, denoted as $u \in \mathcal{C}_i$.
+Let $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ be a graph and $f(\mathcal{G}) = \{\mathcal{C}_1,\ldots,\mathcal{C}_k\}$ denote the community arrangement derived from applying a detection algorithm $f(\cdot)$ to $\mathcal{G}$.
+Furthermore, suppose that $f$ has identified node $u\in \mathcal{V}$ as a member of the community $\mathcal{C}_i\in f(\mathcal{G})$ -- i.e., $i^*_u = i$ -- denoted as $u\in \mathcal{C}_i$.
+The aim of community membership hiding is to formulate a function $h_{\theta}(\cdot)$, parametrized by $\theta$, that takes as input the initial graph $\mathcal{G}$ and produces as output a \textit{new} graph $h_{\theta}(\mathcal{G}) = \mathcal{G'} = (\mathcal{V}, \mathcal{E'})$. Among all the possible graphs, we seek the one which, when input to the community detection algorithm $f$, disassociates a target node $u$ from its original community $\mathcal{C}_i$. %, the community detection algorithm $f$, the target node $u$, and the community $\mathcal{C}_i$, from which we intend to disassociate $u$. The output produced by $h$ manifests as a \textit{new} graph $\mathcal{G}' = (\mathcal{V}, \mathcal{E'})$ such that $f(\mathcal{G}') \neq f(\mathcal{G})$.
+To achieve that goal, suppose that the target node $u$ is associated with a new community $\mathcal{C}'_i \in f(\mathcal{G}')$. %, such that $\mathcal{C}'_i \neq \mathcal{C}_i$.
+Hence, we can define the objective of community membership hiding by establishing a threshold for the similarity between $\mathcal{C}'_i$ and $\mathcal{C}_i$, excluding the target node $u$, which, by definition, belongs to both communities. In other words, we set a condition: $sim(\mathcal{C}_i\setminus \{u\}, \mathcal{C}'_i \setminus \{u\}) \leq \tau$, where $\tau \in [0,1]$.
 
-The aim of community deception is to formulate a function $h_{\theta}(\cdot)$, parametrized by $\theta$, that takes as input the initial graph $\mathcal{G}$ and produces as output a new graph $h_{\theta}(\mathcal{G}) = \mathcal{G'} = (\mathcal{V}, \mathcal{E'})$. Among all the possible graphs, we seek the one which, when input to the community detection algorithm $f$, disassociates a target node $u$ from its original community $\mathcal{C}_i$.
+We assume $sim(\cdot, \cdot)$ ranges between $0$ and $1$.
 
-![Community Detection](images/node_deception.png)
+Several similarity measures can be used to measure $sim(\cdot, \cdot)$ depending on the application domain, e.g., the overlap coefficient (a.k.a. Szymkiewicz–Simpson coefficient), the Jaccard coefficient, and the Sorensen-Dice coefficient.
 
-## Model Architecture
+![Community Detection](images/node_deception_background.png)
 
-![Model Architecture](images/model_architecture.png)
+## Model
 
-To tackle this problem, we have used the **Advantage Actor-Critic** (A2C) algorithm, a popular reinforcement learning technique that combines the advantages of both policy-based and value-based methods. It can be defined as:
+![UML](images/uml_classes_background.png)
+
+
+### Advantage Actor-Critic (A2C)
+
+To learn the optimal policy for our agent defined above, we use the **Advantage Actor-Critic** (A2C) algorithm, a popular deep reinforcement learning technique that combines the advantages of both policy-based and value-based methods.
+Specifically, A2C defines two neural networks, one for the policy ($\pi_{\theta}$) and another for the value function estimator ($V_v$), such that:
 
 ```math
 \nabla_{\theta} \mathcal{J} (\theta)  \sim \underset{t=0}{\overset{T-1}{\sum}} \nabla_{\theta} \text{log} \pi_{\theta} (a_t \vert s_t) A(s_t, a_t) 
@@ -28,15 +38,25 @@ To tackle this problem, we have used the **Advantage Actor-Critic** (A2C) algori
 ```math
 \text{with } A(s_t, a_t) = r_{t+1} + \gamma \mathcal{V}_v(s_{t+1}) - \mathcal{V}_v (s_t)
 ```
+where $\mathcal{J}(\theta)$ is the reward (objective) function, and the goal is to find the optimal policy parameters $\theta$ that maximize it. Instead, $A(s_t, a_t)$ is the advantage function, which quantifies how good or bad an action $a_t$ is compared to the expected value of taking actions according to the current policy.
 
-comprising two neural networks, one for the policy ($\pi_{\theta}$) and another for the value function estimator ($\mathcal{V}_v$), plus, in our case, an encoder for constructing a graph embedding:
+Below, we describe the policy network (*actor*) and value function network (*critic*) separately.
 
-- **Encoder**: The encoder serves as a pivotal component of the architecture, primarily due to the computational complexity of the graph, making it infeasible to directly utilize the adjacency matrix as input for the neural network. The encoder's role involves crafting a graph embedding, which will subsequently be used by the A2C neural networks for decision-making. It comprises a pre-trained *Graph2Vec* model that takes the graph's adjacency matrix as input and returns an embedding vector representing the graph's structure.
-- **Policy (Actor)**: The policy is a neural network that takes the graph embedding as input and yields a probability distribution over actions to be undertaken. Specifically, the policy consists of two fully connected layers with ReLU activation functions and an output layer with SoftMax activation. The output layer has a dimension equal to the number of nodes in the graph, representing the probability distribution over actions. The policy is specifically trained to predict the probability that node $v$ is the optimal node to form the edge $(u, v)$, either to add or remove it, to hide node $u$ from its initial community. Depending on the input node $u$, the feasible actions are a subset of the graph's edges; hence, not all nodes $v \in V$ are potential actions for the policy.
-- **Value (Critic)**: This network is nearly identical to the one used for the policy, with the only distinction being that the output layer has a dimension of $1$, representing the estimated value of the value function. The value function is trained to predict the state-value given a certain action $a$ and a state $s$.
+#### Actor
 
-![UML](images/uml_classes.png)
+The policy network is responsible for generating a probability distribution over possible actions based on the input, which consists of a list of nodes and the graph's feature matrix.
+However, some graphs may lack node features. In such cases, we can extract continuous node feature vectors (i.e., node embeddings) with graph representational learning frameworks like `node2vec`. These node embeddings serve as the feature matrix.
+%ensuring a consistent feature vector size, allowing the model to work with graphs of varying node counts.
 
+Our neural network implementation comprises a primary graph convolution layer (GCNConv) for updating node features. The output of this layer, along with skip connections, feeds into a block consisting of three hidden layers. Each hidden layer includes multi-layer perception (MLP) layers, ReLU activations, and dropout layers. The final output is aggregated using a sum-pooling function. 
+The policy is trained to predict the probability that node $v$ is the optimal choice for adding or removing the edge $(u, v)$ to hide the target node $u$ from its original community.
+The feasible actions depend on the input node $u$ and are restricted to a subset of the graph's edges. Hence, not all nodes $v \in \mathcal{V}$ are viable options for the policy.
+
+#### Critic
+
+This network closely resembles the one employed for the policy, differing only in one aspect: it incorporates a global sum-pooling operation on the convolution layer's output. This pooling operation results in an output layer with a size of 1, signifying the estimated value of the value function. The role of the value function is to predict the state value when provided with a specific action $a_t$ and state $s_t$
+
+![Model Architecture](images/model_architecture_background.png)
 
 ## Requirements
 
@@ -77,7 +97,7 @@ and finally install pytorch geometric:
 
 
 
-## Training
+## Run the code
 
 To train the model, run the following command:
 
@@ -95,9 +115,6 @@ to modify the parameters of the model, please refer to the `main.py` file.
 
 ## References
 
-
-### Code References
-
 The A2C structure is a reimplementation of the code found in the following repository:
 
 ```bibtex
@@ -109,62 +126,74 @@ The A2C structure is a reimplementation of the code found in the following repos
 }
 ```
 
+all the other references are in the `references` folder.
+
 ## Directory Structure
 
 ```bash
 ├── dataset
-│   ├── archives                          # Contains the archives of the datasets   
-│   │   └── ...
-│   ├── data                              # Contains the datasets
-│   │   └── ...
-│   └── readme.md
-├── notebook                              # Contains the notebooks used for the analysis
-│   └── ...
-├── references                            # Contains articles used for the thesis
-│   └── ...
-├── src                                   # Contains the source code
-│   ├── agent                             # Contains the agent code
-│   │   ├── a2c
-│   │   │   ├── a2c.py
-│   │   │   ├── actor.py
-│   │   │   ├── critic.py
-│   │   │   ├── graph_encoder.py
-│   │   │   ├── __init__.py
-│   │   │   ├── memory.py
-│   │   │   └── readme.md
-│   │   ├── agent.py
-│   │   ├── __init__.py
-│   │   └── readme.md
-│   ├── community_algs                  # Contains algorithms for community analysis
-│   │   ├── baselines                   # Contains the baselines for community deception
-│   │   │   ├── degree_hiding.py
-│   │   │   ├── random_hiding.py
-│   │   │   ├── readme.md
-│   │   │   └── roam_hiding.py
-│   │   ├── metrics                     # Contains an implementation of the metrics used for the evaluation
-│   │   │   ├── deception_score.py
-│   │   │   ├── nmi.py
-│   │   │   ├── permanence.py
-│   │   │   └── safeness.py
-│   │   ├── detection_algs.py           # Contains the community detection algorithms
-│   │   ├── __init__.py
-│   │   └── readme.md
-│   ├── environment                     # Contains the environment of the agent
-│   │   ├── graph_env.py
-│   │   ├── __init__.py
-│   │   └── readme.md
-│   ├── logs                            # Contains the logs of the training
-│   │   ├── ...
-│   │   └── readme.md
-│   ├── utils                           # Contains utility functions
-│   │   ├── similarity.py               # Contains the functions to measure the similarity
-│   │   ├── test.py                     # Contains the functions to test the model
-│   │   └── utils.py                    # Contains constants and other utility functions
-│   └── __init__.py
-├── test                                # Contains the output of the test                    
-│   ├── ....
-│   └── readme.md
-├── main.py                             # Main file, used to train and test the model                 
+│   ├── archives                            # Contains the archives of the datasets 
+│   │   └── ...
+│   ├── data                                # Contains the datasets
+│   │   └── ...
+│   └── readme.md
+├── images                                  # Images used in the README
+│   └── ...
+├── notebook                                # Contains the notebooks used for the analysis
+│   └── ...                           
+├── references                              # Contains articles used for the thesis
+│   └── ...                           
+├── src                                     # Contains the source code
+│   ├── agent
+│   │   ├── a2c                             # Contains the agent code
+│   │   │   ├── a2c.py
+│   │   │   ├── actor.py
+│   │   │   ├── critic.py
+│   │   │   ├── __init__.py
+│   │   │   └── readme.md
+│   │   ├── agent.py
+│   │   ├── __init__.py
+│   │   └── readme.md
+│   ├── community_algs                      # Contains algorithms for community analysis
+│   │   ├── baselines
+│   │   │   ├── community_hiding            # Community Deception algorithms
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── modularity.py
+│   │   │   │   ├── modularity_test.py
+│   │   │   │   ├── permanence.py
+│   │   │   │   ├── safeness.py
+│   │   │   │   └── safeness_tets.py
+│   │   │   ├── node_hiding                 # Node Deception algorithms
+│   │   │   │   ├── degree_hiding.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── random_hiding.py
+│   │   │   │   └── roam_hiding.py
+│   │   │   ├── __init__.py
+│   │   │   └── readme.md
+│   │   ├── metrics                         # Contains an implementation of the metrics used for the evaluation
+│   │   │   ├── deception_score.py
+│   │   │   ├── nmi.py
+│   │   │   ├── readme.md
+│   │   │   └── similarity.py
+│   │   ├── detection_algs.py               # Contains the community detection algorithms
+│   │   ├── __init__.py
+│   │   └── readme.md
+│   ├── environment                         # Contains the environment of the agent
+│   │   ├── graph_env.py
+│   │   ├── __init__.py
+│   │   └── readme.md
+│   ├── models                              # Contains the trained models
+│   │   └── ...
+│   ├── utils                               # Contains utility functions
+│   │   ├── hiding_community.py
+│   │   ├── hiding_node.py
+│   │   ├── __init__.py
+│   │   ├── readme.md
+│   │   └── utils.py
+│   └── __init__.py
+├── test                                    # Contains the output of the test
+│   └── ...
+├── main.py
 ├── README.md
 └── requirements.txt
 ```

@@ -25,9 +25,13 @@ Several similarity measures can be used to measure $sim(\cdot, \cdot)$ depending
 
 ![Community Detection](images/node_deception_background.png)
 
+This diagram describes a simplification of the Node Deception process and its various phases. Given a graph $\mathcal{G}$, a node $u$ (in this case $u=E$), a budget of actions $\beta$, and the set of communities $\mathcal{C}$ identified by the community detection algorithm $f(\cdot)$ (including the community $\mathcal{C}_i$ to which the node belongs), the Node Deception process consists of adding inter-community edges $\mathcal{E}_{u,i}^+$ (green edges), or removing intra-community edges $\mathcal{E}_{u,i}^-$ (red edge), so that the value returned by the similarity function $sim(\cdot, \cdot)$, between the new community to which the node belongs after rewiring, and the original one, is lower than the $\tau$ constraint.
+
 ## Model
 
 ![UML](images/uml_classes_background.png)
+
+UMl diagram of the classes used in the project.
 
 
 ### Advantage Actor-Critic (A2C)
@@ -60,6 +64,8 @@ The feasible actions depend on the input node $u$ and are restricted to a subset
 This network closely resembles the one employed for the policy, differing only in one aspect: it incorporates a global sum-pooling operation on the convolution layer's output. This pooling operation results in an output layer with a size of 1, signifying the estimated value of the value function. The role of the value function is to predict the state value when provided with a specific action $a_t$ and state $s_t$
 
 ![Model Architecture](images/model_architecture_background.png)
+
+Network architecture overview of the **Actor** and **Critic**. Initially, the node's continuous feature vectors are acquired by employing `node2vec`, subsequently modified through the graph convolutions and processed through non-linearities to establish the concentration parameters $\xi \in \R^{|\mathcal{V}|}_+$ (i.e. correlated with the probability density on the shares) and the estimated value function $V(s_t)$.
 
 ## Requirements
 

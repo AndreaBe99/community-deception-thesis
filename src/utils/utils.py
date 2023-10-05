@@ -31,37 +31,15 @@ class FilePaths(Enum):
     # ! Trained model path for testing (change the following line to change the model)
     TRAINED_MODEL = "src/models/steps-10000_words-gre_eps-0_model.pth"
     
-    # Dataset file paths
+    # USED DATASETS
     KAR = DATASETS_DIR + '/kar.mtx'
-    # KAR = DATASETS_DIR + '/kar.gml'
-    DOL = DATASETS_DIR + '/dol.mtx'
-    # DOL = DATASETS_DIR + '/dol.gml'
-    MAD = DATASETS_DIR + '/mad.mtx'
-    # MAD = DATASETS_DIR + '/mad.gml'
-    LESM = DATASETS_DIR + '/lesm.mtx'
-    # LESM = DATASETS_DIR + '/lesm.gml'
-    POLB = DATASETS_DIR + '/polb.mtx'
-    # POLB = DATASETS_DIR + '/polb.gml'
     WORDS = DATASETS_DIR + '/words.mtx'
-    # WORDS = DATASETS_DIR + '/words.gml'
     VOTE = DATASETS_DIR + '/vote.mtx'
-    # NETS = DATASETS_DIR + '/nets.mtx'
-    NETS = DATASETS_DIR + '/nets.gml'
-    ERDOS = DATASETS_DIR + '/erdos.mtx'
-    # ERDOS = DATASETS_DIR + '/erdos.gml'
-    POW = DATASETS_DIR + '/pow.mtx'
-    # POW = DATASETS_DIR + '/pow.gml'
-    FB_75 = DATASETS_DIR + '/fb-75.mtx'
-    # FB_75 = DATASETS_DIR + '/fb-75.gml'
     
-    # The following datasets are too big, scipy cannot load them
-    # DBLP = DATASETS_DIR + '/dblp.mtx'
-    # ASTR = DATASETS_DIR + '/astr.mtx'
-    # AMZ = DATASETS_DIR + '/amz.mtx'
-    AMZ = DATASETS_DIR + '/amz.txt'
-    # YOU = DATASETS_DIR + '/you.mtx'
-    YOU = DATASETS_DIR + '/you.txt'
-    # ORK = DATASETS_DIR + '/ork.mtx'
+    # DIAG DATASETS
+    ASTR = DATASETS_DIR + '/astr.txt'
+    FB_75 = DATASETS_DIR + '/fb-75.txt'
+    POW = DATASETS_DIR + '/pow.txt'
 
 
 class DetectionAlgorithmsNames(Enum):
@@ -221,7 +199,11 @@ class Utils:
         # try:
         # Check if the graph file is in the .mtx format or .gml
         if file_path.endswith(".txt"):
-            graph = nx.read_edgelist(file_path)
+            # if is the POW graph use weighted edges
+            if file_path.endswith("pow.txt"):
+                graph = nx.read_weighted_edgelist(file_path, nodetype=int)
+            else:
+                graph = nx.read_edgelist(file_path, nodetype=int)
         elif file_path.endswith(".mtx"):
             graph_matrix = scipy.io.mmread(file_path)
             graph = nx.Graph(graph_matrix)

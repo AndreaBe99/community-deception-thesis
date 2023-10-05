@@ -93,9 +93,11 @@ class CommunityHiding():
         # self.agent.env.beta = beta
         # self.agent.env.set_rewiring_budget()
 
-        # Budget for the whole community
-        self.community_edge_budget = int(math.ceil(self.original_graph.number_of_edges() * \
-            (self.beta/100)))
+        # Budget for the whole community, beta percentage of the number of nodes
+        # in the target community
+        # self.community_edge_budget = self.beta
+        self.community_edge_budget = math.ceil(len(self.community_target) * (self.beta/100))
+        
         # Set the node budge as the community budget 
         self.node_edge_budget = self.community_edge_budget
         
@@ -106,7 +108,7 @@ class CommunityHiding():
         # target community. So we set manually all the values of set_rewiring_budget
         # function.
         self.agent.env.edge_budget = self.node_edge_budget
-        # ! self.agent.env.max_steps = self.agent.env.original_graph.number_of_edges()
+        self.agent.env.max_steps = self.node_edge_budget * HyperParams.MAX_STEPS_MUL.value
         self.agent.env.used_edge_budget = 0
         self.agent.env.stop_episode = False
         self.agent.env.reward = 0
@@ -136,6 +138,8 @@ class CommunityHiding():
         # Copy the community target to avoid modifying the original one
         self.community_target = copy.deepcopy(self.agent.env.community_target)
         # self.node_target = self.agent.env.node_target
+        
+        self.set_parameters(self.beta, self.tau)
 
         # Initialize the Deception Score algorithm
         self.deception_score_obj = DeceptionScore(
@@ -143,14 +147,14 @@ class CommunityHiding():
         
         self.safeness_obj = Safeness(
             self.community_edge_budget,
-            self.original_graph,
+            self.original_graph.copy(),
             self.community_target,
             self.community_structure,
         )
         
         self.modularity_obj = Modularity(
             self.community_edge_budget,
-            self.original_graph,
+            self.original_graph.copy(),
             self.community_target,
             self.community_structure,
             self.agent.env.detection,
@@ -338,16 +342,16 @@ class CommunityHiding():
             node_centralities = nx.centrality.degree_centrality(new_graph)
             # Choose the next node to hide, as the node with the highest 
             # centrality in the new community
-            node = max(
-                (n for n in new_community if n in self.community_target), 
-                key=lambda n: node_centralities[n])
-            # ! Increment the total steps
-            # tot_steps += self.agent.step
+            if self.agent.env.used_edge_budget > 0:
+                # If the agent has not performed all the rewiring actions
+                node = max(
+                    (n for n in new_community if n in self.community_target), 
+                    key=lambda n: node_centralities[n])
             tot_steps += self.agent.env.used_edge_budget
             # Reduce the edge budget
             self.agent.env.edge_budget = self.node_edge_budget - tot_steps
-            # print("Edge Budget Used:", self.agent.env.used_edge_budget)
-            # print("Agent Steps:", self.agent.step)
+            self.agent.env.max_steps = self.agent.env.edge_budget * \
+                HyperParams.MAX_STEPS_MUL.value
             # Check if the agent reached the goal
             if tot_steps >= self.community_edge_budget or node is None:
                 if self.agent.env.new_community_structure is None:

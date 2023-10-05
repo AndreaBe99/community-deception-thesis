@@ -65,7 +65,7 @@ This network closely resembles the one employed for the policy, differing only i
 
 ![Model Architecture](images/model_architecture_background.png)
 
-Network architecture overview of the **Actor** and **Critic**. Initially, the node's continuous feature vectors are acquired by employing `node2vec`, subsequently modified through the graph convolutions and processed through non-linearities to establish the concentration parameters $\xi \in \R^{|\mathcal{V}|}_+$ (i.e. correlated with the probability density on the shares) and the estimated value function $V(s_t)$.
+Network architecture overview of the **Actor** and **Critic**. Initially, the node's continuous feature vectors are acquired by employing `node2vec`, subsequently modified through the graph convolutions and processed through non-linearities to establish the concentration parameters $\xi \in R^{|\mathcal{V}|}_+$ (i.e. correlated with the probability density on the shares) and the estimated value function $V(s_t)$.
 
 ## Requirements
 

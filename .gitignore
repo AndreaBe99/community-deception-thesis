@@ -179,5 +179,5 @@ centrality_full_budget_v1/
 centrality_full_budget_v2/
 
 # EXCLUDE USELESS CODE
-manually/
+src/utils/manually/plot_from_json.py
 community_deception_large_graphs/

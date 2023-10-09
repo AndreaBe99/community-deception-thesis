@@ -2,8 +2,6 @@
 
 ## Introduction
 
-This repository contains the code for the thesis **Community Deception on online Social Networks** for the Master's Degree in Computer Science at Università La Sapienza di Roma.
-
 In a nutshell, community membership hiding aims to enable a target node within a graph to elude being recognized as a member of a particular node cluster, as determined by a community detection algorithm.
 This objective is accomplished by granting the node in question the ability to strategically modify its connections with other nodes.
 Therefore, our primary focus is on making changes to the graph's structure, represented by the adjacency matrix. While the alteration of node features holds potential interest, that aspect is reserved for future exploration.

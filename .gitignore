@@ -183,3 +183,6 @@ src/utils/manually/plot_from_json.py
 community_deception_large_graphs/
 references/
 logs/
+test/pow/
+test/nets/
+test_cdlib/

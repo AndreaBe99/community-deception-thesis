@@ -181,3 +181,4 @@ centrality_full_budget_v2/
 # EXCLUDE USELESS CODE
 src/utils/manually/plot_from_json.py
 old_logs/
+test/astr/

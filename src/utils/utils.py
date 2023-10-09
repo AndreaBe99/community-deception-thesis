@@ -19,14 +19,6 @@ class FilePaths(Enum):
     DATASETS_DIR = 'dataset/data'
     LOG_DIR    = 'src/logs/'
     TEST_DIR = 'test/'
-    # ° Kaggle
-    # DATASETS_DIR = '/kaggle/input/network-community'
-    # LOG_DIR = '/kaggle/working/logs/'
-    # TEST_DIR = '/kaggle/working/test/'
-    # ° Google Colab
-    # DATASETS_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Datasets"
-    # LOG_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Logs/"
-    # TEST_DIR = "/content/drive/MyDrive/Sapienza/Tesi/Test/"
     
     # ! Trained model path for testing (change the following line to change the model)
     TRAINED_MODEL = "src/models/steps-10000_words-gre_eps-0_model.pth"

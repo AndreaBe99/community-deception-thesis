@@ -11,6 +11,7 @@ import networkx as nx
 import random
 import time
 import torch
+import copy
 
 
 class GraphEnvironment(object):
@@ -169,7 +170,7 @@ class GraphEnvironment(object):
             Node to remove from the community
         """
         if community is None:
-            # Select randomly a new community target different from the last one
+            # ° METHOD 1: Select randomly a new community target different from the last one
             old_community = self.community_target.copy()
             done = False
             while not done:
@@ -182,6 +183,25 @@ class GraphEnvironment(object):
                             len(self.original_community_structure.communities) < 2:
                     done = True
             del old_community
+            
+            # ° METHOD 2: Get the community with the highest number of nodes
+            # max_nodes = 0
+            # for community in self.original_community_structure.communities:
+            #     if len(community) > max_nodes:
+            #         max_nodes = len(community)
+            #         self.community_target = community
+            
+            # ° METHOD 3: Choose the community based on the distribution of the number of nodes in the communities
+            # communities = copy.deepcopy(self.original_community_structure.communities)
+            # communities = sorted(communities, key=len)
+            # # Get the number of nodes in each community
+            # n_nodes = [len(community) for community in communities]
+            # # Compute the probability distribution
+            # prob_dist = [n_node / sum(n_nodes) for n_node in n_nodes]
+            # # Choose a community based on the probability distribution
+            # self.community_target = random.choices(
+            #     communities, weights=prob_dist, k=1)[0]
+            # del communities, n_nodes, prob_dist
         else:
             self.community_target = community
         # Change the target node to remove from the community

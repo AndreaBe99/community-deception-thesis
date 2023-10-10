@@ -182,3 +182,5 @@ centrality_full_budget_v2/
 src/utils/manually/plot_from_json.py
 old_logs/
 test/astr/
+test/pow/
+test/nets/

@@ -1,15 +1,6 @@
 # Test
 
-## Budget Assignment
-
-This folder is organized as follows:
-
-- `degree_distributed_budget`: contains the tests where we assign a budget to each node proportional to its degree, and the sum of the budgets is equal to the community deception task, i.e. a percentage of the number of edges of the graph.
-- `degree_full_budget`: contains the tests where we assign at beginning a budget equal to the community deception task, i.e. a percentage of the number of edges of the graph, to each node, and at each iteration we decrease the budget based on the number of actions performed by the agent on the previous iteration.
-
-## Subfolder Description
-
-Both folders contains the files for three different datasets:
+This folder contains the files for three different datasets:
 
 - `kar`, $\sim 40$ nodes;
 - `words`, $\sim 100$ nodes;
@@ -41,7 +32,3 @@ For each combination of dataset and Detection Algorithm, we have performed two d
   - **NMI**, Normalized Mutual Information, value between 0 and 1;
   - Average number of **steps** to hide the node;
   - **Time** to hide the node;
-
-**! NOTE:** With the `vote` dataset, we have decided to perform 10 iterations for each combination of $\tau$ and $\beta$ because we wanted to have a good approximation of the results, but we have not performed 100 iterations because the time to perform 100 iterations was too high.
-
-**! NOTE:** In the `degree_distributed_budget` folder, we have not performed the **Node Deception** task, because the different ways to assign the budget to the nodes, not influence the results of the **Node Deception** task.  
